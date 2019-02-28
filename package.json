@@ -1,0 +1,19 @@
+{
+  "name": "things-server",
+  "version": "0.0.1",
+  "description": "Node.js getting started",
+  "private": true,
+  "main": "server.js",
+  "engines": {
+    "node": ">=8"
+  },
+  "author": "Johnny Pham",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@google-cloud/datastore": "2.0.0",
+    "@google-cloud/debug-agent": "^3.0.1",
+    "express": "^4.16.3",
+    "socket.io": "^2.2.0"
+  },
+  "devDependencies": {}
+}
