@@ -1,0 +1,159 @@
+<!--
+  (TODO)
+  1. The Vue registered components should be refactored in to following 
+    structure:
+
+    card-window
+      |_______ lists-container
+      |            |___________ Avatar list
+      |            |___________ Answer card list
+      |
+      |_______ Submit-form
+
+  2. When submit form button is click, submit-form emit an event to two 
+    lists and each one add an element (avatar and related answers).
+    There also should be a list to store the correct answers.
+  
+  3. When there are three answers on the screen, input form is disabled and 
+     allow user match avatar to answer and generate a list of object 
+     representing the user's answer. (Should figure out the way for user to 
+     match the answers)
+-->
+
+
+<!--
+  (Basic thoughts for front-end design)
+
+  In-game interface design:
+  +-----------------------------------------------+
+  |             |                                 |
+  |             |                                 |
+  |  Game Logo  |                                 |    <---- The list for players' answers
+  |Players Info |         Players' answers        |          Avatars are displayed on the left, answers to the right
+  |             |                                 |
+  |             |                                 |
+  |  Personal   |_________________________________|                                
+  |   Points    | > ......                 | ==>> |    <---- Players' answer input (for 3 of 4 players) 
+  +-----------------------------------------------+          / confirm matching (answers to players) (for the rest one player)
+
+
+  Game process:
+    Players role: 4 players, one for matching answers, the others fill in the sentence in the card
+    For each round, the process is divided into two stage:
+
+      The first stage: those 3 players enter the answers and then display the answers on the screen;
+      the answers are visible for those 3 players, invisible for the one who matches the answers to players.
+      When all 3 players submit answers, goto teh second stage.
+
+      The second stage: The answers' order are shuffled. Then the answers become visible to everyone,
+      that one player matches the answers to players (in some way, I'm still thinking about...) and after that
+      compare the matching result to the correct answers. 
+
+  Front Back end communication:
+    During the first stage, one player submit an answer, frontend shall emit an event that send an object
+    {playerID: '...', answer: '...'} to backend, backend stores that object into a list []. When there are 
+    three object in that list, backend emits an event to frontend to indicate that it's time for second stage.
+
+    During the second stage, the player match the answers and then send an list [{playerID, answer}, {playerID, answer}, ...]
+    and compare to the previous list stored in the back end. 
+
+  Some ideas for "Room":
+    Either static or dynamic way is fine, depends on the backend implementation. Here is a little bit my ideas:
+      Maintain a counter which works as a roomid generator: start at 1.
+        If someone create a room, assign current id to that room and the counter increment one. 
+      Maintain a list to store each room's information, in the same time, the index of the list is the roomid
+      [{
+        roomid: ...,
+        owner: ..., // owner's id
+        players: [],
+        players_answers: [], // as mentioned in the first stage
+        player_matched: [], // as mentioned in the second stage
+        status: ..., // waiting-players || ingame 
+      }]
+     
+  Temporary goals:
+    Mar. 5th:  frontend and backend basic functionalities for one round
+    Mar. 7th:  refine & valid frontend-backend data transforming
+    Mar. 12nd or 14th: implement mulitple rounds & refine user interface
+    Mar. 19th:  testing and validation
+
+
+-->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+    <title>The game of things</title>
+
+    <style>
+      #cards {
+        list-style-type: none; 
+        margin: 0; 
+        padding: 0;
+      }
+
+      #cards li { 
+        padding: 5px 10px; 
+      }
+
+      .card-container {
+        position: relative;
+        border: solid;
+        height: 50px;
+        width: 200px;
+        margin-bottom: 2px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- The submitted cards list -->
+    <div id="cards-window">
+      <ul id="cards">
+        <card-view
+          v-for="card in submittedCards"
+          v-bind:card="card"></card-view>
+      </ul>
+
+      <!-- The input form to submit -->
+      <br>
+      <p>the answer for the question is {{ input_msg }}</p>
+      <input id="answer-input" v-model="input_msg">
+      <button v-on:click="submitAnswer">Enter</button>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    Vue.component('card-view', {
+      props: ['card'],
+      template: '\
+        <div class=\"card-container\">\
+          <p>\
+            {{ card.answer }}\
+          </p>\
+        </div>\
+      '
+    });
+
+    var cardWindow = new Vue({
+      el: '#cards-window',
+      data: {
+        submittedCards: [
+          {answer: 'the first answer'},
+          {answer: 'the second answer'},
+          {answer: 'the third answer'},
+        ],
+        input_msg: ''
+      },
+      methods: {
+        submitAnswer: function() {
+          this.submittedCards.push({answer: this.input_msg});
+        }
+      }
+    });
+
+  </script>
+</html>
