@@ -1,25 +1,13 @@
 <!--
   (TODO)
-  1. The Vue registered components should be refactored in to following 
-    structure:
-
-    card-window
-      |_______ lists-container
-      |            |___________ Avatar list           <-- finished
-      |            |___________ Answer card list
-      |
-      |_______ Submit-form                            <-- finished
-
-  2. When submit form button is click, submit-form emit an event to two 
-    lists and each one add an element (avatar and related answers).
-    There also should be a list to store the correct answers.       
-
-    [ Avatar list event emitting is finished ]
-  
-  3. When there are three answers on the screen, input form is disabled and 
+  1. When there are four answers on the screen, input form is disabled and 
      allow user match avatar to answer and generate a list of object 
-     representing the user's answer. (Should figure out the way for user to 
-     match the answers)
+     representing the user's answer. 
+  
+  2. Figure out how to receive an object outside components so that the 
+     oject sent by socket.io can be received by the Vue components.
+
+  3. Figure out transition of two states of the game.
 -->
 
 
@@ -108,6 +96,28 @@
         width: 200px;
         margin-bottom: 2px;
       }
+
+      .lists-container {
+        position: relative;
+        margin: 0%;
+      }
+
+      .avatar-list-container {
+        position: relative;
+        border: solid;
+        width: 20%;
+        top: 1%;
+        overflow: hidden;
+      }
+
+      .answer-list-container {
+        position: absolute;
+        border: solid;
+        width: 50%;
+        top: 1%;
+        left: 21%;
+        overflow: hidden;
+      }
     </style>
   </head>
   <body>
@@ -119,7 +129,7 @@
     Vue.component('avatar-list', {
       props: ['avatar'],
       template: '\
-        <div class=\"avatar-list-container\">\
+        <div>\
           <p>\
             {{ avatar.username }}\
           </p>\
@@ -127,23 +137,38 @@
       '
     });
 
+    Vue.component('answer-list', {
+      props: ['answer'],
+      template: '\
+        <div>\
+          <p>\
+            {{ answer.useranswer }}\
+          </p>\
+        </div>\
+      '
+    })
+
     Vue.component('input-form', {
       props: ['input_msg'],
       template: '\
         <div>\
           <br>\
           <p>\
-            the answer for the question is {{ userinput }}\
+            {{ user.username }}\'s answer for the question is {{ user.userinput }}\
           </p>\
-          <input id=\"answer-input\" v-model=\"userinput\">\
-          <button v-on:click=\"$emit(\'submit-answer\', userinput)\">\
+          <input id=\"username-input\" v-model=\"user.username\">\
+          <input id=\"answer-input\" v-model=\"user.userinput\">\
+          <button v-on:click=\"$emit(\'submit-answer\', user)\">\
             Enter\
           </button>\
         </div>\
       ',
       data: function() {
         return {
-          userinput: '',
+          user: {
+            username: '',
+            userinput: ''
+          }
         };
       }
     });
@@ -151,16 +176,30 @@
     Vue.component('card-window', {
       props: ['card'],
       template: '\
-        <div>\
-          <ul id="avatars">\
-            <avatar-list\
-              v-for="avatar in submittedUsers"\
-              v-bind:avatar="avatar"\
-            ></avatar-list>\
-          </ul>\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <ul id="avatars">\
+              <avatar-list\
+                v-for="avatar in submittedUsers"\
+                v-bind:avatar="avatar"\
+              ></avatar-list>\
+            </ul>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <ul id="answers">\
+              <answer-list\
+                v-for="answer in submittedAnswers"\
+                v-bind:answer="answer"\
+              ></answer-list>\
+            </ul>\
+          </div>\
+        \
           <input-form\
             v-bind:input_msg="input"\
             v-on:submit-answer=\"submitAnswer\"></input-form>\
+        \
         </div>\
       ',
       data: function() {
@@ -170,20 +209,26 @@
             {username: 'play2'},
             {username: 'play3'},
           ],
+          submittedAnswers: [
+            {useranswer: 'answer1'},
+            {useranswer: 'answer2'},
+            {useranswer: 'answer3'},
+          ],
           input: ''
         };
       }, 
       methods: {
         submitAnswer: function(answer) {
           console.log(answer);
-          this.submittedUsers.push({username: answer});
+          this.submittedUsers.push({username: answer.username});
+          this.submittedAnswers.push({useranswer: answer.userinput});
         }
       }
     });
 
     var app = new Vue({
       el: '#app',
-      /*data: {
+      /* data: {
         submittedUsers: [
           {username: 'play1'},
           {username: 'play2'},
@@ -195,7 +240,7 @@
         submitAnswer: function() {
           this.submittedUsers.push({username: this.input_msg})
         }
-      }*/
+      } */
     }); 
   </script>
 </html>
