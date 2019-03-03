@@ -3,11 +3,8 @@
   1. When there are four answers on the screen, input form is disabled and 
      allow user match avatar to answer and generate a list of object 
      representing the user's answer. 
-  
-  2. Figure out how to receive an object outside components so that the 
-     oject sent by socket.io can be received by the Vue components.
 
-  3. Figure out transition of two states of the game.
+  2. Figure out transition of two states of the game.
 -->
 
 
@@ -122,7 +119,11 @@
   </head>
   <body>
     <div id="app">
-      <card-window></card-window>
+      <card-window
+        v-bind:users="submittedUsers"
+        v-bind:answers="submittedAnswers"></card-window>
+      <input-form
+        v-on:submit-answer="submitAnswer"></input-form>
     </div>
   </body>
   <script type="text/javascript">
@@ -174,14 +175,14 @@
     });
 
     Vue.component('card-window', {
-      props: ['card'],
+      props: ['users', 'answers'],
       template: '\
         <div id="lists-container">\
         \
           <div class="avatar-list-container">\
             <ul id="avatars">\
               <avatar-list\
-                v-for="avatar in submittedUsers"\
+                v-for="avatar in users"\
                 v-bind:avatar="avatar"\
               ></avatar-list>\
             </ul>\
@@ -190,57 +191,62 @@
           <div class="answer-list-container">\
             <ul id="answers">\
               <answer-list\
-                v-for="answer in submittedAnswers"\
+                v-for="answer in answers"\
                 v-bind:answer="answer"\
               ></answer-list>\
             </ul>\
           </div>\
         \
-          <input-form\
-            v-bind:input_msg="input"\
-            v-on:submit-answer=\"submitAnswer\"></input-form>\
-        \
         </div>\
       ',
-      data: function() {
-        return {
-          submittedUsers: [
-            {username: 'play1'},
-            {username: 'play2'},
-            {username: 'play3'},
-          ],
-          submittedAnswers: [
-            {useranswer: 'answer1'},
-            {useranswer: 'answer2'},
-            {useranswer: 'answer3'},
-          ],
-          input: ''
-        };
-      }, 
-      methods: {
-        submitAnswer: function(answer) {
-          console.log(answer);
-          this.submittedUsers.push({username: answer.username});
-          this.submittedAnswers.push({useranswer: answer.userinput});
-        }
-      }
     });
 
-    var app = new Vue({
+    let app = new Vue({
       el: '#app',
-      /* data: {
+      data: {
         submittedUsers: [
           {username: 'play1'},
           {username: 'play2'},
           {username: 'play3'},
         ],
+        submittedAnswers: [
+          {useranswer: 'answer1'},
+          {useranswer: 'answer2'},
+          {useranswer: 'answer3'},
+        ],
         input_msg: ''
       },
       methods: {
-        submitAnswer: function() {
-          this.submittedUsers.push({username: this.input_msg})
+        submitAnswer: function(answer) {
+          this.submittedUsers.push({username: answer.username});
+          this.submittedAnswers.push({useranswer: answer.userinput});
         }
-      } */
+      } 
     }); 
+
+    // test something like server object which is outside the Vue component
+    let socketdata1 = {
+      username: 'from server 1',
+      useranswer: 'from server answer 1'
+    }
+
+    let socketdata2 = {
+      username: 'from server 2',
+      useranswer: 'from server answer 2'
+    }
+
+    // pretend to receiving data from backend
+    app.submittedUsers
+      .push({username: socketdata1.username});
+
+    app.submittedAnswers
+      .push({useranswer: socketdata1.useranswer});
+
+    app.submittedUsers
+      .push({username: socketdata2.username});
+
+    app.submittedAnswers
+      .push({useranswer: socketdata2.useranswer});
+
   </script>
 </html>
