@@ -1,10 +1,8 @@
 <!--
   (TODO)
-  1. When there are four answers on the screen, input form is disabled and 
-     allow user match avatar to answer and generate a list of object 
-     representing the user's answer. 
+  1. Figure out the interfaces for different roles of players.
 
-  2. Figure out transition of two states of the game.
+  2. FIgure out the left status bar: game logo, players' status, personal points...
 -->
 
 
@@ -119,14 +117,33 @@
   </head>
   <body>
     <div id="app">
+      <!--
       <card-window
         v-bind:users="submittedUsers"
         v-bind:answers="submittedAnswers"></card-window>
-      <input-form
-        v-on:submit-answer="submitAnswer"></input-form>
+      -->
+      <component
+        v-bind:is="displayMode"
+        v-bind:users="submittedUsers"
+        v-bind:answers="submittedAnswers"></component>
+      
+      <component
+        v-bind:is="inputMode"
+        v-bind:guess="guessedResult"
+        v-on:submit-answer="submitAnswer"></component>
+
+      <button
+        v-for="mode in gameModes"
+        v-bind:key="mode"
+        v-on:click="currentGameMode = mode">{{ mode }}</button>
     </div>
   </body>
   <script type="text/javascript">
+    // The components for the answering stage:
+    // - avatar list          "avatar-list"
+    // - answer list          "answer-list"
+    // - answer input form    "input-form"
+    // - card display window  "card-window"
     Vue.component('avatar-list', {
       props: ['avatar'],
       template: '\
@@ -147,7 +164,7 @@
           </p>\
         </div>\
       '
-    })
+    });
 
     Vue.component('input-form', {
       props: ['input_msg'],
@@ -201,28 +218,169 @@
       ',
     });
 
+
+    // The components for the guessing stage:
+    // - avatar list          "guess-avatar-list"
+    // - answer list          "guess-answer-list"
+    // - answer input form    "guess-form"
+    // - card display window  "guess-window"
+    Vue.component('guess-avatar-list', {
+      props: ['avatar'],
+      template: '\
+        <div\
+          v-on:click=\"globalEmitUsernameSelected\">\
+          <p>\
+            {{ avatar.username }}\
+          </p>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          username: this.avatar
+        }
+      },
+      methods: {
+        globalEmitUsernameSelected: function() {
+          this.$root.guessedResult.username = this.avatar.username;
+          EventBus.$emit('guessed-username', this.avatar);
+        }
+      }
+    });
+
+    Vue.component('guess-answer-list', {
+      props: ['answer'],
+      template: '\
+        <div\
+          v-on:click=\"globalEmitAnswerSelected\">\
+          <p>\
+            {{ answer.useranswer }}\
+          </p>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          useranswer: this.answer
+        }
+      },
+      methods: {
+        globalEmitAnswerSelected: function() {
+          this.$root.guessedResult.useranswer = this.answer.useranswer;
+          EventBus.$emit('guessed-answer', this.answer);
+        }
+      }
+    });
+
+    Vue.component('guess-form', {
+      props: ['guess'],
+      template: '\
+        <div>\
+          <p>\
+            {{ guess.username }} said {{ guess.useranswer }}\
+          </p>\
+        </div>\
+      ',
+    });
+
+    Vue.component('guess-window', {
+      props: ['users', 'answers'],
+      template: '\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <ul id="avatars">\
+              <guess-avatar-list\
+                v-for="avatar in users"\
+                v-bind:avatar="avatar"\
+              ></guess-avatar-list>\
+            </ul>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <ul id="answers">\
+              <guess-answer-list\
+                v-for="answer in answers"\
+                v-bind:answer="answer"\
+              ></guess-answer-list>\
+            </ul>\
+          </div>\
+        \
+        </div>\
+      ',
+    });
+
+    // The event bus handling the global events 
+    const EventBus = new Vue();
+
+    // The top level component: app
     let app = new Vue({
       el: '#app',
       data: {
+        // the user infos for having submitted answer
         submittedUsers: [
           {username: 'play1'},
           {username: 'play2'},
           {username: 'play3'},
         ],
+        // the answers of the users
         submittedAnswers: [
           {useranswer: 'answer1'},
           {useranswer: 'answer2'},
           {useranswer: 'answer3'},
         ],
+        // current mode of the game, default (initial) is answering
+        currentGameMode: 'answer',
+        // game mode: currently there are two: answering and guessing
+        gameModes: [
+          'answer',
+          'guess'
+        ],
+        // the results of the guessing (name matches answer)
+        guessedResult: {
+          username: '',
+          useranswer: '',
+        },
         input_msg: ''
       },
       methods: {
         submitAnswer: function(answer) {
           this.submittedUsers.push({username: answer.username});
           this.submittedAnswers.push({useranswer: answer.userinput});
+        },
+      },
+      computed: {
+        inputMode: function() {
+          switch(this.currentGameMode) {
+            case 'answer': 
+              return 'input-form';
+            case 'guess':
+              return 'guess-form';
+            default: 
+              return 'unknown: currentGameMode error';
+          }
+        },
+        displayMode: function() {
+          switch(this.currentGameMode) {
+            case 'answer': 
+              return 'card-window';
+            case 'guess':
+              return 'guess-window';
+            default: 
+              return 'unknown: currentGameMode error';
+          }
         }
       } 
     }); 
+
+    EventBus.$on('guessed-username', function(username) {
+      console.log(`received user selected name ${username.username}`);
+      app.guessedResult.username = username.username;
+    });
+
+    EventBus.$on('guessed-answer', function(answer) {
+      console.log(`received user selected name ${answer.useranswer}`);
+      app.guessedResult.useranswer = answer.useranswer;
+      console.log(app.guessedResult.useranswer);
+    });
 
     // test something like server object which is outside the Vue component
     let socketdata1 = {
