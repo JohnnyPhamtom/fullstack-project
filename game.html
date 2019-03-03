@@ -1,6 +1,9 @@
 <!--
   (TODO)
   1. Figure out the interfaces for different roles of players.
+     - invisible cards for other players in answering stage
+  
+  2. Figure out "who is current player"
 
   2. FIgure out the left status bar: game logo, players' status, personal points...
 -->
@@ -113,6 +116,19 @@
         left: 21%;
         overflow: hidden;
       }
+
+      .flip-list-move {
+        transition: transform 1s;
+      } 
+
+      .component-fade-enter-active, .component-fade-leave-active {
+        transition: opacity .5s ease;
+      }
+      
+      .component-fade-enter, .component-fade-leave-to
+        /* .component-fade-leave-active below version 2.1.8 */ {
+        opacity: .0;
+      }
     </style>
   </head>
   <body>
@@ -122,10 +138,12 @@
         v-bind:users="submittedUsers"
         v-bind:answers="submittedAnswers"></card-window>
       -->
-      <component
-        v-bind:is="displayMode"
-        v-bind:users="submittedUsers"
-        v-bind:answers="submittedAnswers"></component>
+      <transition name="component-fade" mode="out-in">
+        <component
+          v-bind:is="displayMode"
+          v-bind:users="submittedUsers"
+          v-bind:answers="submittedAnswers"></component>
+      </transition>
       
       <component
         v-bind:is="inputMode"
@@ -135,10 +153,17 @@
       <button
         v-for="mode in gameModes"
         v-bind:key="mode"
+        v-on:click="gameModeTransition(mode)">{{ mode }}</button>
+      <!--
+      <button
+        v-for="mode in gameModes"
+        v-bind:key="mode"
         v-on:click="currentGameMode = mode">{{ mode }}</button>
+      -->
     </div>
   </body>
   <script type="text/javascript">
+
     // The components for the answering stage:
     // - avatar list          "avatar-list"
     // - answer list          "answer-list"
@@ -296,17 +321,33 @@
           </div>\
         \
           <div class="answer-list-container">\
-            <ul id="answers">\
+            <transition-group name=\"flip-list\" tag=\"ul\">\
               <guess-answer-list\
                 v-for="answer in answers"\
                 v-bind:answer="answer"\
+                v-bind:key="answer.useranswer"\
               ></guess-answer-list>\
-            </ul>\
+            </transition-group>\
           </div>\
         \
         </div>\
       ',
     });
+
+
+    // The components for out-of-round stage
+    // 1. out of round status bar  "out-of-round-form"
+    Vue.component('out-of-round-form', {
+      props: [],
+      template: '\
+        <div>\
+          <p>\
+            You\'re out of round!\
+          </p>\
+        </div>\
+      '
+    });
+
 
     // The event bus handling the global events 
     const EventBus = new Vue();
@@ -332,7 +373,8 @@
         // game mode: currently there are two: answering and guessing
         gameModes: [
           'answer',
-          'guess'
+          'guess',
+          'out of round'
         ],
         // the results of the guessing (name matches answer)
         guessedResult: {
@@ -346,6 +388,21 @@
           this.submittedUsers.push({username: answer.username});
           this.submittedAnswers.push({useranswer: answer.userinput});
         },
+        gameModeTransition: function(mode) {
+          if(mode === 'guess') {
+            this.shuffle();
+          }
+          this.currentGameMode = mode;
+        },
+        shuffle: function() {
+          for(let ii = this.submittedAnswers.length - 1; ii > 0; ii--) {
+            let randomIndex = Math.floor(Math.random() * ii);
+
+            let temp = this.submittedAnswers[ii];
+            Vue.set(this.submittedAnswers, ii, this.submittedAnswers[randomIndex]);
+            Vue.set(this.submittedAnswers, randomIndex, temp);
+          }
+        }
       },
       computed: {
         inputMode: function() {
@@ -354,6 +411,8 @@
               return 'input-form';
             case 'guess':
               return 'guess-form';
+            case 'out of round':
+              return 'out-of-round-form';
             default: 
               return 'unknown: currentGameMode error';
           }
@@ -364,11 +423,13 @@
               return 'card-window';
             case 'guess':
               return 'guess-window';
+            case 'out of round':
+              return 'card-window';
             default: 
               return 'unknown: currentGameMode error';
           }
         }
-      } 
+      }
     }); 
 
     EventBus.$on('guessed-username', function(username) {
@@ -379,7 +440,6 @@
     EventBus.$on('guessed-answer', function(answer) {
       console.log(`received user selected name ${answer.useranswer}`);
       app.guessedResult.useranswer = answer.useranswer;
-      console.log(app.guessedResult.useranswer);
     });
 
     // test something like server object which is outside the Vue component
