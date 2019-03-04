@@ -5,9 +5,28 @@ require('@google-cloud/debug-agent').start();
 var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
+var session = require('express-session');
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
+// For tracking user across pages
+app.use(session({
+    name: 'session',
+    secret: 'things_game',
+    resave: 'false',
+    saveUninitialized: 'false',
+    cookie: {
+        maxAge: 2 * 60 * 60 * 1000
+    }
+}));
+
+// Keep track of which rooms are active
+// Potentially:
+/* room = {
+    id = roomID,
+    status = {'active', 'inactive'},
+    expires = 'current time + 2hrs'
+}*/
 var roomList = [];
 
 // ON USING DATASTORE: found at https://cloud.google.com/appengine/docs/standard/nodejs/using-cloud-datastore
@@ -44,6 +63,7 @@ app.get('/', async function(req,res){
         console.log("res: " + result);
         console.log("ents: " + entities);
         console.log("card: " + card);
+        console.log(req.sessionID);
     } catch(error){
         console.log(error);
     };
@@ -52,21 +72,26 @@ app.get('/', async function(req,res){
 
 // creates a game page.
 app.get('/game/', function(req,res){
-    let room = Math.random().toString(36).replace('0.', '').substr(0,6);
-    roomList.push(room);
-    console.log(room);
-    console.log(roomList);
+    let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
+    while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
+        roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
+    roomList.push(roomId);
+    //console.log(roomId);
+    //console.log(roomList);
+    console.log(req.sessionID);
+    console.log(req.session.cookie);
     res.status(200);
     res.contentType('text/html');
-    res.write('room number generated: '+ room);
+    res.write('room number generated: '+ roomId);
     res.end();
     //res.sendFile(__dirname + '/game.html');
 });
 
 // testing for random room generation
 app.get('/game/:room/', function(req,res){
-    console.log(req.params.room);
-    console.log(roomList);
+    //console.log(req.params.room);
+    //console.log(roomList);
+    console.log(req.sessionID)
     if(roomList.includes(req.params.room)){
         res.status(200);
         res.contentType('text/html');
@@ -80,7 +105,8 @@ app.get('/game/:room/', function(req,res){
     }
 });
 
-// on user connect.
+// On user connect to game lobby?
+// Handles all user connection requests and events
 io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     socket.on('chat message', function(msg){
