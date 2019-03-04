@@ -6,6 +6,7 @@ var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 var session = require('express-session');
+var bodyParser = require('body-parser');
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
@@ -18,6 +19,12 @@ app.use(session({
     cookie: {
         maxAge: 2 * 60 * 60 * 1000
     }
+}));
+
+// For parsing data
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({
+    extended: true
 }));
 
 // Keep track of which rooms are active
@@ -43,6 +50,15 @@ const datastore = Datastore();
 function randomInt(max){
     return Math.floor(Math.random() * max);
 }
+// Create game room
+function newRoom(){
+    let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
+    while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
+        roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
+    roomList.push(roomId);
+    console.log('fn(newRoom):: ' + roomList);
+    return roomId;
+}
 
 // this needs to be ran asynchronously
 function getCard() {
@@ -54,7 +70,17 @@ function getCard() {
     .limit(10);
     return datastore.runQuery(query);
 }
+// Simpler front page. All it will do is serve an html page and await a form submission
+app.get('/', function(req,res){
+    console.log('front.html:: ' + req.sessionID);
+    //res.json({roomList: {roomList}});
+    res.sendFile(__dirname + '/front.html');
+});
+app.get('/roomlist', function(req,res){
+    res.json({roomList});
+})
 // home page. will need to handle user generation and new room generation.
+/*
 app.get('/', async function(req,res){
     try {
         const result = await getCard();
@@ -67,15 +93,35 @@ app.get('/', async function(req,res){
     } catch(error){
         console.log(error);
     };
-    res.sendFile(__dirname + '/index.html');
+    res.sendFile(__dirname + '/front.html');
 });
+*/
 
+// Upon the submit POST button from the home page, we need to determine if
+// the user wants to join or create a room.
+// Then redirect the user to the appropriate room.
+app.post('/', function(req,res){
+    console.log("onPOST:: " + req.body.username)
+    console.log(req.body.roomId)
+    if(req.body.roomId){
+        console.log('true')
+        req.params.roomId = req.body.roomId;
+    }
+    else{
+        console.log('false')
+        req.params.roomId = newRoom();
+    }
+
+    //res.status(200);
+    //res.contentType('text/html');
+    //res.write('room number generated: '+ JSON.stringify(req.body, null, 2));
+    //res.end();
+    res.redirect('/'+ req.params.roomId);
+})
 // creates a game page.
+/*
 app.get('/game/', function(req,res){
-    let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
-    while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
-        roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
-    roomList.push(roomId);
+    
     //console.log(roomId);
     //console.log(roomList);
     console.log(req.sessionID);
@@ -86,22 +132,36 @@ app.get('/game/', function(req,res){
     res.end();
     //res.sendFile(__dirname + '/game.html');
 });
-
+*/
 // testing for random room generation
-app.get('/game/:room/', function(req,res){
+app.get('/:roomId/', async function(req,res){
     //console.log(req.params.room);
     //console.log(roomList);
     console.log(req.sessionID)
-    if(roomList.includes(req.params.room)){
-        res.status(200);
-        res.contentType('text/html');
-        res.write('welcome to the random room..\n' + req.params.room);
-        res.end();
+    if(roomList.includes(req.params.roomId)){
+        try {
+            const result = await getCard();
+            const entities = result[0];
+            const card = entities.map( entity => `${entity.Text}`);
+            console.log(card)
+            res.status(200);
+            res.contentType('text/html');
+            res.write(card.toString());
+
+            res.end();
+        }catch(error){
+            console.log(error);
+        }
+        
     }else {
+        console.log('room not found :: ' + req.params.roomId)
+        res.redirect('/');
+        /*
         res.status(200);
         res.contentType('text/html');
-    res.write('room not found: '+ req.params.room);
-    res.end();
+        res.write('room not found: '+ req.params.roomId);
+        res.end();
+        */
     }
 });
 
