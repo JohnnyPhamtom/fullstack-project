@@ -33,6 +33,7 @@ app.use(bodyParser.urlencoded({
     id = roomID,
     status = {'active', 'inactive'},
     expires = 'current time + 2hrs'
+    cards =[]
 }*/
 var roomList = [];
 
@@ -61,6 +62,8 @@ function newRoom(){
 }
 
 // this needs to be ran asynchronously
+// querying at each game request would be costly and inefficient..
+// Need to query for a whole deck and then randomly give out a card for repeated gameplay
 function getCard() {
     let randNum = randomInt(3);
     const query = datastore
@@ -70,6 +73,23 @@ function getCard() {
     .limit(10);
     return datastore.runQuery(query);
 }
+// Handle ajax request for data in suggestrooms
+// If the query is short, we show all rooms, otherwise we only
+// show relevant results
+app.get('/suggestrooms',function(req,res){
+    console.log(req.query);
+    if(req.query.roomList.length < 3)
+        res.json(roomList);
+    else{
+        var newList = []
+        roomList.forEach(function(element){
+            if(element.includes(req.query.roomList))
+                newList.push(element)
+        })
+        res.json(newList);
+    }
+    res.end();
+})
 // Simpler front page. All it will do is serve an html page and await a form submission
 app.get('/', function(req,res){
     console.log('front.html:: ' + req.sessionID);
@@ -164,6 +184,8 @@ app.get('/:roomId/', async function(req,res){
         */
     }
 });
+
+
 
 // On user connect to game lobby?
 // Handles all user connection requests and events
