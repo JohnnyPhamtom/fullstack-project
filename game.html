@@ -1,10 +1,9 @@
 <!--
   (TODO)
   1. Figure out the interfaces for different roles of players.
-     - invisible cards for other players in answering stage
+     - invisible cards for other players in answering stage  <-- finished
+     - when someone guessed a correct match, remove that one in two lists
   
-  2. Figure out "who is current player"
-
   2. FIgure out the left status bar: game logo, players' status, personal points...
 -->
 
@@ -133,42 +132,33 @@
   </head>
   <body>
     <div id="app">
-      <!--
-      <card-window
-        v-bind:users="submittedUsers"
-        v-bind:answers="submittedAnswers"></card-window>
-      -->
       <transition name="component-fade" mode="out-in">
         <component
           v-bind:is="displayMode"
+          v-bind:current-player="currentPlayer"
           v-bind:users="submittedUsers"
-          v-bind:answers="submittedAnswers"></component>
+          v-bind:answers="submittedAnswers"
+          v-bind:cards="submittedCards"></component>
       </transition>
       
       <component
         v-bind:is="inputMode"
         v-bind:guess="guessedResult"
+        v-bind:current-player="currentPlayer"
         v-on:submit-answer="submitAnswer"></component>
 
       <button
         v-for="mode in gameModes"
         v-bind:key="mode"
         v-on:click="gameModeTransition(mode)">{{ mode }}</button>
-      <!--
-      <button
-        v-for="mode in gameModes"
-        v-bind:key="mode"
-        v-on:click="currentGameMode = mode">{{ mode }}</button>
-      -->
     </div>
   </body>
   <script type="text/javascript">
-
-    // The components for the answering stage:
+    // The components for the out-of-round stage:
     // - avatar list          "avatar-list"
     // - answer list          "answer-list"
-    // - answer input form    "input-form"
     // - card display window  "card-window"
+    // - out of round status bar  "out-of-round-form"
     Vue.component('avatar-list', {
       props: ['avatar'],
       template: '\
@@ -191,41 +181,27 @@
       '
     });
 
-    Vue.component('input-form', {
-      props: ['input_msg'],
+    Vue.component('out-of-round-form', {
+      props: [],
       template: '\
         <div>\
-          <br>\
           <p>\
-            {{ user.username }}\'s answer for the question is {{ user.userinput }}\
+            You\'re out of round!\
           </p>\
-          <input id=\"username-input\" v-model=\"user.username\">\
-          <input id=\"answer-input\" v-model=\"user.userinput\">\
-          <button v-on:click=\"$emit(\'submit-answer\', user)\">\
-            Enter\
-          </button>\
         </div>\
-      ',
-      data: function() {
-        return {
-          user: {
-            username: '',
-            userinput: ''
-          }
-        };
-      }
+      '
     });
 
     Vue.component('card-window', {
-      props: ['users', 'answers'],
+      props: ['cards'],
       template: '\
         <div id="lists-container">\
         \
           <div class="avatar-list-container">\
             <ul id="avatars">\
               <avatar-list\
-                v-for="avatar in users"\
-                v-bind:avatar="avatar"\
+                v-for="card in cards"\
+                v-bind:avatar="card"\
               ></avatar-list>\
             </ul>\
           </div>\
@@ -233,8 +209,8 @@
           <div class="answer-list-container">\
             <ul id="answers">\
               <answer-list\
-                v-for="answer in answers"\
-                v-bind:answer="answer"\
+                v-for="card in cards"\
+                v-bind:answer="card"\
               ></answer-list>\
             </ul>\
           </div>\
@@ -314,8 +290,8 @@
           <div class="avatar-list-container">\
             <ul id="avatars">\
               <guess-avatar-list\
-                v-for="avatar in users"\
-                v-bind:avatar="avatar"\
+                v-for="user in users"\
+                v-bind:avatar="user"\
               ></guess-avatar-list>\
             </ul>\
           </div>\
@@ -335,19 +311,84 @@
     });
 
 
-    // The components for out-of-round stage
-    // 1. out of round status bar  "out-of-round-form"
-    Vue.component('out-of-round-form', {
-      props: [],
+    // The components for the answering stage
+    Vue.component('invisible-answer-list', {
+      props: ['card', 'current-player'],
       template: '\
         <div>\
           <p>\
-            You\'re out of round!\
+            {{ displayedAnswer }}\
           </p>\
         </div>\
-      '
+      ',
+      computed: {
+        displayedAnswer: function() {
+          // console.log(this.card);
+          return this.card.username == this.currentPlayer.username 
+            ? this.card.useranswer : '?';
+        }
+      }
     });
 
+    Vue.component('answer-window', {
+      props: ['cards', 'current-player'],
+      template: '\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <ul id="avatars">\
+              <avatar-list\
+                v-for="card in cards"\
+                v-bind:avatar="card"\
+              ></avatar-list>\
+            </ul>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <ul id="answers">\
+              <invisible-answer-list\
+                v-for="card in cards"\
+                v-bind:card="card"\
+                v-bind:current-player="currentPlayer"\
+              ></invisible-answer-list>\
+            </ul>\
+          </div>\
+        \
+        </div>\
+      ',
+    });
+
+    Vue.component('input-form', {
+      props: ['input_msg', 'current-player'],
+      template: '\
+        <div>\
+          <br>\
+          <p>\
+            {{ user.username }}\'s answer for the question is {{ user.userinput }}\
+          </p>\
+          <input id=\"username-input\" v-model=\"user.username\">\
+          <input id=\"answer-input\" v-model=\"user.userinput\">\
+          <button v-on:click=\"$emit(\'submit-answer\', user)\">\
+            Enter\
+          </button>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          user: {
+            username: this.currentPlayer.username,
+            userinput: ''
+          }
+        };
+      }
+    });
+
+
+    // for frontend testing, current player info
+    let socketDataForCurrentPlayer = {
+      username: 'current player',
+      userid: '123456789'
+    }
 
     // The event bus handling the global events 
     const EventBus = new Vue();
@@ -356,7 +397,33 @@
     let app = new Vue({
       el: '#app',
       data: {
+        // current player
+        currentPlayer: {
+          // assume that the players are identified by their names
+          username: socketDataForCurrentPlayer.username, 
+          // or their ids assigned by backend
+          userid: socketDataForCurrentPlayer.userid, 
+        },
+        // the players' info in current room
+        playersInRoom: [
+          // an array of player objects
+        ],
         // the user infos for having submitted answer
+        submittedCards: [
+          {
+            username: 'player1',
+            useranswer: 'answer1'
+          },
+          {
+            username: 'player2',
+            useranswer: 'answer2'
+          },
+          {
+            username: 'player3',
+            useranswer: 'answer3'
+          },
+        ],
+        // separated two lists for shuffling in guessing stage
         submittedUsers: [
           {username: 'play1'},
           {username: 'play2'},
@@ -385,8 +452,13 @@
       },
       methods: {
         submitAnswer: function(answer) {
+          console.log(answer);
           this.submittedUsers.push({username: answer.username});
           this.submittedAnswers.push({useranswer: answer.userinput});
+          this.submittedCards.push({
+            username: answer.username,
+            useranswer: answer.userinput
+          })
         },
         gameModeTransition: function(mode) {
           if(mode === 'guess') {
@@ -420,7 +492,7 @@
         displayMode: function() {
           switch(this.currentGameMode) {
             case 'answer': 
-              return 'card-window';
+              return 'answer-window';
             case 'guess':
               return 'guess-window';
             case 'out of round':
@@ -465,6 +537,18 @@
 
     app.submittedAnswers
       .push({useranswer: socketdata2.useranswer});
+    
+    app.submittedCards
+      .push({
+        username: socketdata1.username,
+        useranswer: socketdata1.useranswer
+      });
+    
+    app.submittedCards
+      .push({
+        username: socketdata2.username,
+        useranswer: socketdata2.useranswer
+      });
 
   </script>
 </html>
