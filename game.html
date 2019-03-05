@@ -6,6 +6,10 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta http-equiv="Content-Type" content="text/html"; charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+    
+    <script type="text/javascript" src="http://localhost:8080/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 
@@ -165,6 +169,7 @@
           v-bind:is="inputMode"
           v-bind:guess="guessedResult"
           v-bind:current-player="currentPlayer"
+          v-bind:key="currentPlayer"
           v-on:submit-answer="submitAnswer"
           v-on:submit-guessed-match="submitGuessedMatch"></component>
 
@@ -174,6 +179,11 @@
           v-on:click="gameModeTransition(mode)">{{ mode }}</button>  
         </div>
       </div>
+
+      <input 
+        id="username" 
+        v-model="currentPlayer.username" 
+        style="position:relative;">
     </div>
   </body>
   <script type="text/javascript">
@@ -391,15 +401,16 @@
       ',
     });
 
+    //  <input id=\"username-input\" v-model=\"user.username\">\
+
     Vue.component('input-form', {
       props: ['input_msg', 'current-player'],
       template: '\
         <div>\
           <br>\
           <p>\
-            {{ user.username }}\'s answer for the question is {{ user.userinput }}\
+            {{ currentPlayer.username }}\'s answer for the question is {{ user.userinput }}\
           </p>\
-          <input id=\"username-input\" v-model=\"user.username\">\
           <input id=\"answer-input\" v-model=\"user.userinput\">\
           <button v-on:click=\"$emit(\'submit-answer\', user)\">\
             Enter\
@@ -445,13 +456,19 @@
 
 
     // for frontend testing, current player info
-    let socketDataForCurrentPlayer = {
+    /* let socketDataForCurrentPlayer = {
       username: 'current player',
       userid: '123456789'
-    }
+    } */
 
     // The event bus handling the global events 
     const EventBus = new Vue();
+
+    let socket = io.connect();
+    socket.on('session', function (session) {
+      // jQuery('#username').val(session.username);
+      EventBus.$emit('currentplayer', session.username);
+    });
 
     // The top level component: app
     let app = new Vue({
@@ -460,9 +477,7 @@
         // current player
         currentPlayer: {
           // assume that the players are identified by their names
-          username: socketDataForCurrentPlayer.username, 
-          // or their ids assigned by backend
-          userid: socketDataForCurrentPlayer.userid, 
+          username: '', 
         },
         // the players' info in current room
         playersInRoom: [
@@ -470,9 +485,6 @@
           {username: 'player1'},
           {username: 'player2'},
           {username: 'player3'},
-          {username: 'from server 1'},
-          {username: 'from server 2'},
-          {username: 'current player'},
         ],
         // the user infos for having submitted answer
         submittedCards: [
@@ -518,7 +530,7 @@
       },
       methods: {
         submitAnswer: function(answer) {
-          console.log(answer);
+          console.log(answer.username + '......' + answer.userinput);
           this.submittedUsers.push({username: answer.username});
           this.submittedAnswers.push({useranswer: answer.userinput});
           this.submittedCards.push({
@@ -613,41 +625,12 @@
       app.guessedResult.useranswer = answer.useranswer;
     });
 
-    // test something like server object which is outside the Vue component
-    let socketdata1 = {
-      username: 'from server 1',
-      useranswer: 'from server answer 1'
-    }
-
-    let socketdata2 = {
-      username: 'from server 2',
-      useranswer: 'from server answer 2'
-    }
-
-    // pretend to receiving data from backend
-    app.submittedUsers
-      .push({username: socketdata1.username});
-
-    app.submittedAnswers
-      .push({useranswer: socketdata1.useranswer});
-
-    app.submittedUsers
-      .push({username: socketdata2.username});
-
-    app.submittedAnswers
-      .push({useranswer: socketdata2.useranswer});
-    
-    app.submittedCards
-      .push({
-        username: socketdata1.username,
-        useranswer: socketdata1.useranswer
-      });
-    
-    app.submittedCards
-      .push({
-        username: socketdata2.username,
-        useranswer: socketdata2.useranswer
-      });
+    EventBus.$on('currentplayer', function(username) {
+      console.log(`received current player from server ${username}`);
+      // jQuery('#username-input').val(username);
+      app.currentPlayer = {username: username};
+      app.playersInRoom.push({username: username});
+    });
 
   </script>
 </html>

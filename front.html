@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html"; charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+        <script type="text/javascript" src="http://localhost:8080/socket.io/socket.io.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+        <title>Things Front Page</title>
+    </head>
+    <body>
+        <form action="/" method="post">
+                <label for="username">Username: </label>
+                <input name="username" id="username" type="text" placeholder="username"></input>
+                <br>
+                <label for="room ID">Room: </label>
+                <input name="roomId" id="roomId" type="text" placeholder="room ID"></input>
+                <button id="join">Join/Create</button>
+            <pre id="output"></pre>
+        </form>
+                
+        <script type="text/javascript">
+            // This outputs a list object, but doesnt populate an auto-complete
+            /*
+            $('#roomId').on('input', function(){
+                $.ajax({
+                    'type': 'GET',
+                    'url': 'suggestrooms?roomList=' + $('#roomId').val(),
+                    'success':function(data){
+                        console.log(JSON.stringify(data));
+                        readData = JSON.stringify(data);
+                        parseData = JSON.parse(readData);
+                        //strData = readData;
+                        console.log(parseData);
+                        strData = parseData.join("\n");
+                        $('#output').text(strData);
+                    }
+                })
+            })*/
+
+            // jquery-ui method for auto-complete
+            $("#roomId")
+            .autocomplete({
+                source: function(req,res){
+                    $.ajax({
+                    'type': 'GET',
+                    'url': 'suggestrooms?roomList=' + $('#roomId').val(),
+                    data: {
+                        roomList: req.roomList
+                    },
+                    success: function(data){
+                        res(data);
+                    },
+                                      
+                    });
+                }
+            });
+
+            jQuery(function() {
+                var socket = io();
+
+                jQuery('#join').on('click', function() {
+                    console.log('????');
+                    socket.emit('user connection', {
+                        username: jQuery('#username').val()
+                    });
+                });
+            });
+           
+        </script>
+    </body>
+</html>
