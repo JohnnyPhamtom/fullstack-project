@@ -134,7 +134,7 @@ app.post('/', function(req,res){
         console.log('false')
         req.params.roomId = newRoom();
     }
-
+    req.session.roomId = req.params.roomId;
     //res.status(200);
     //res.contentType('text/html');
     //res.write('room number generated: '+ JSON.stringify(req.body, null, 2));
@@ -197,6 +197,7 @@ io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
+    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);
     socket.on('chat message', function(msg){
         io.emit('chat message', msg);
         console.log('message: ' + msg);
