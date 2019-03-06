@@ -2,49 +2,31 @@
 
 require('@google-cloud/debug-agent').start();
 
-var http = require('http')
-  , path = require('path')
-  , express = require('express')
-  , bodyParser = require('body-parser')
-  , cookieParser = require('cookie-parser')
-  , methodOverride = require('method-override')
-  , expressSession = require('express-session')
-  , app = express();
-
-var myCookieParser = cookieParser('secret');
-var sessionStore = new expressSession.MemoryStore();
-
+var app = require('express')();
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
+var session = require('express-session')({
+    name: 'session',
+    secret: 'things_game',
+    resave: 'true',
+    saveUninitialized: 'true',
+    cookie: {
+        maxAge: 2 * 60 * 60 * 1000
+    }
+    });
+var bodyParser = require('body-parser');
+var ios = require('socket.io-express-session');
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
 // For tracking user across pages
-/*
-app.use(session({
-    name: 'session',
-    secret: 'things_game',
-    resave: 'false',
-    saveUninitialized: 'false',
-    cookie: {
-        maxAge: 2 * 60 * 60 * 1000
-    }
-}));
-*/
+app.use(session);
 
 // For parsing data
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
-
-app.use(methodOverride());
-app.use(myCookieParser);
-app.use(expressSession({ secret: 'secret', store: sessionStore }));
-
-var server = http.Server(app)
-  , io = require('socket.io')(server);
-
-var SessionSockets = require('session.socket.io')
-  , sessionSockets = new SessionSockets(io, sessionStore, myCookieParser);
 
 // Keep track of which rooms are active
 // Potentially:
@@ -55,9 +37,6 @@ var SessionSockets = require('session.socket.io')
     cards =[]
 }*/
 var roomList = [];
-
-// session id matches username
-let onlineUsers = [];
 
 // ON USING DATASTORE: found at https://cloud.google.com/appengine/docs/standard/nodejs/using-cloud-datastore
 // By default, the client will authenticate using the service account file
@@ -144,8 +123,9 @@ app.get('/', async function(req,res){
 // Then redirect the user to the appropriate room.
 app.post('/', function(req,res){
     console.log("onPOST:: " + req.body.username)
+    console.log(req.session.username)
+    req.session.username = req.body.username;
     console.log(req.body.roomId)
-    console.log(`********   ${req.sessionID}`)
     if(req.body.roomId){
         console.log('true')
         req.params.roomId = req.body.roomId;
@@ -154,24 +134,13 @@ app.post('/', function(req,res){
         console.log('false')
         req.params.roomId = newRoom();
     }
-    // temp
-    // if this userid exists in the list, update username and room
-    /*onlineUsers[req.session] = {
-        userid: req.session,
-        username: req.body.username,
-        room: req.params.roomId
-    };*/
-
-    res.redirect(`/${req.params.roomId}/${req.body.username}`)
 
     //res.status(200);
     //res.contentType('text/html');
     //res.write('room number generated: '+ JSON.stringify(req.body, null, 2));
     //res.end();
-    
-    // <  temporary comment out  >
-    // res.redirect('/'+ req.params.roomId);
-});
+    res.redirect('/'+ req.params.roomId);
+})
 // creates a game page.
 /*
 app.get('/game/', function(req,res){
@@ -187,29 +156,22 @@ app.get('/game/', function(req,res){
     //res.sendFile(__dirname + '/game.html');
 });
 */
-
-
 // testing for random room generation
-
-app.get('/:roomId/:username', async function(req,res){
+app.get('/:roomId/', async function(req,res){
     //console.log(req.params.room);
     //console.log(roomList);
     console.log(req.sessionID)
     if(roomList.includes(req.params.roomId)){
         try {
-            const result = await getCard();
-            const entities = result[0];
-            const card = entities.map( entity => `${entity.Text}`);
-            console.log(card)
+            //const result = await getCard();
+            //const entities = result[0];
+            //const card = entities.map( entity => `${entity.Text}`);
+            //console.log(card)
             //res.status(200);
             //res.contentType('text/html');
             //res.write(card.toString());
-
+            res.sendFile(__dirname + '/game.html');
             //res.end();
-            req.session.roomId = req.params.roomId;
-            req.session.username = req.params.username;
-
-            res.sendFile(__dirname + '/game.html')
         }catch(error){
             console.log(error);
         }
@@ -217,34 +179,37 @@ app.get('/:roomId/:username', async function(req,res){
     }else {
         console.log('room not found :: ' + req.params.roomId)
         res.redirect('/');
-        
-        //res.status(200);
-        //res.contentType('text/html');
-        //res.write('room not found: '+ req.params.roomId);
-        //res.end();
-        
+        /*
+        res.status(200);
+        res.contentType('text/html');
+        res.write('room not found: '+ req.params.roomId);
+        res.end();
+        */
     }
 });
 
+
+
 // On user connect to game lobby?
 // Handles all user connection requests and events
-sessionSockets.on('connection', function(err, socket, session){
-    socket.emit('session', session);
-
+io.use(ios(session));
+io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
-    socket.on('user connection', function(data) {
-        console.log(`........... ${data.username}`);
+    console.log("inside a socket conn:" + socket.handshake.sessionID);
+    console.log('socket conn: uname:: ' + socket.handshake.session.username);
+
+    io.emit('playerJoin', {
+        username: socket.handshake.session.username,
     });
 
     socket.on('chat message', function(msg){
         io.emit('chat message', msg);
         console.log('message: ' + msg);
     });
-
     socket.on('disconnect', function(){
         console.log('user disconnected');
     });
 });
-server.listen(process.env.PORT || 8080, function(){
+http.listen(process.env.PORT || 3000, function(){
     console.log('listening on *:' + process.env.PORT);
 });

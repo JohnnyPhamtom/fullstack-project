@@ -9,9 +9,11 @@
     <meta http-equiv="Content-Type" content="text/html"; charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
     
-    <script type="text/javascript" src="http://localhost:8080/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script type="text/javascript" src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.slim.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-socket.io-extended"></script>
 
     <title>The game of things</title>
 
@@ -169,7 +171,7 @@
           v-bind:is="inputMode"
           v-bind:guess="guessedResult"
           v-bind:current-player="currentPlayer"
-          v-bind:key="currentPlayer"
+          v-bind:key="currentPlayer.username"
           v-on:submit-answer="submitAnswer"
           v-on:submit-guessed-match="submitGuessedMatch"></component>
 
@@ -455,20 +457,12 @@
     });
 
 
-    // for frontend testing, current player info
-    /* let socketDataForCurrentPlayer = {
-      username: 'current player',
-      userid: '123456789'
-    } */
 
-    // The event bus handling the global events 
+    // The event bus handling the global page's events 
     const EventBus = new Vue();
 
-    let socket = io.connect();
-    socket.on('session', function (session) {
-      // jQuery('#username').val(session.username);
-      EventBus.$emit('currentplayer', session.username);
-    });
+    // vue-socket.io-extended set up
+    Vue.use(VueSocketIOExt, io('http://localhost:3000'));
 
     // The top level component: app
     let app = new Vue({
@@ -612,6 +606,13 @@
               return 'unknown: currentGameMode error';
           }
         }
+      },
+      // handle all the events sent from server side
+      sockets: {
+        playerJoin: function(data) {
+          this.currentPlayer.username = data.username;
+          app.playersInRoom.push({username: data.username});
+        }
       }
     }); 
 
@@ -624,13 +625,5 @@
       console.log(`received user selected name ${answer.useranswer}`);
       app.guessedResult.useranswer = answer.useranswer;
     });
-
-    EventBus.$on('currentplayer', function(username) {
-      console.log(`received current player from server ${username}`);
-      // jQuery('#username-input').val(username);
-      app.currentPlayer = {username: username};
-      app.playersInRoom.push({username: username});
-    });
-
   </script>
 </html>
