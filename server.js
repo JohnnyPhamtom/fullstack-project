@@ -5,21 +5,22 @@ require('@google-cloud/debug-agent').start();
 var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
-var session = require('express-session');
+var session = require('express-session')({
+    name: 'session',
+    secret: 'things_game',
+    resave: 'true',
+    saveUninitialized: 'true',
+    cookie: {
+        maxAge: 2 * 60 * 60 * 1000
+    }
+    });
 var bodyParser = require('body-parser');
+var ios = require('socket.io-express-session');
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
 // For tracking user across pages
-app.use(session({
-    name: 'session',
-    secret: 'things_game',
-    resave: 'false',
-    saveUninitialized: 'false',
-    cookie: {
-        maxAge: 2 * 60 * 60 * 1000
-    }
-}));
+app.use(session);
 
 // For parsing data
 app.use(bodyParser.json());
@@ -122,6 +123,8 @@ app.get('/', async function(req,res){
 // Then redirect the user to the appropriate room.
 app.post('/', function(req,res){
     console.log("onPOST:: " + req.body.username)
+    console.log(req.session.username)
+    req.session.username = req.body.username;
     console.log(req.body.roomId)
     if(req.body.roomId){
         console.log('true')
@@ -160,15 +163,15 @@ app.get('/:roomId/', async function(req,res){
     console.log(req.sessionID)
     if(roomList.includes(req.params.roomId)){
         try {
-            const result = await getCard();
-            const entities = result[0];
-            const card = entities.map( entity => `${entity.Text}`);
-            console.log(card)
-            res.status(200);
-            res.contentType('text/html');
-            res.write(card.toString());
-
-            res.end();
+            //const result = await getCard();
+            //const entities = result[0];
+            //const card = entities.map( entity => `${entity.Text}`);
+            //console.log(card)
+            //res.status(200);
+            //res.contentType('text/html');
+            //res.write(card.toString());
+            res.sendFile(__dirname + '/index.html');
+            //res.end();
         }catch(error){
             console.log(error);
         }
@@ -189,8 +192,11 @@ app.get('/:roomId/', async function(req,res){
 
 // On user connect to game lobby?
 // Handles all user connection requests and events
+io.use(ios(session));
 io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
+    console.log("inside a socket conn:" + socket.handshake.sessionID);
+    console.log('socket conn: uname:: ' + socket.handshake.session.username);
     socket.on('chat message', function(msg){
         io.emit('chat message', msg);
         console.log('message: ' + msg);
