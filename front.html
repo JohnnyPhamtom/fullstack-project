@@ -30,7 +30,7 @@
       html, body {
         padding: 0px;
         margin: 0px;
-        overflow-x: hidden;
+        overflow: hidden;
         width: 100%;
         height: 100%;
       }
@@ -307,28 +307,42 @@
         width: 30%;
       }
 
-      #nav-to-right {
+      #avatars-null {
         position: absolute;
+        width: 50%;
+        height: 50%;
+        left: 20%;
         top: 50%;
         transform: translateY(-50%);
-        right: 1px;
         z-index: 3;
       }
 
-      #nav-to-right:hover {
-        cursor: pointer;
-      }
-
-      #nav-to-left {
+      #avatars-container {
         position: absolute;
+        border: solid;
+        flex-wrap: wrap;
+        display: flex;
+        background-color: white;
+        width: 71%;
+        height: 80%;
+        left: 0px;
         top: 50%;
         transform: translateY(-50%);
-        left: 1px;
-        z-index: 2;
+        z-index: 3; 
       }
 
-      #nav-to-left:hover {
-        cursor: pointer;
+      .avatar {
+        display: flex;
+        justify-content: space-around;
+        width: 22%;
+        height: 22%;
+        margin: 10px;
+      }
+
+      .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
       }
 
       .component-fade-enter-active, .component-fade-leave-active {
@@ -336,7 +350,6 @@
       }
       
       .component-fade-enter, .component-fade-leave-to {
-        /* .component-fade-leave-active below version 2.1.8 */ 
         opacity: .0;
       }
     </style>
@@ -357,10 +370,18 @@
         <img id="mid-top-character" src="./assets/frontpage_img_2.jpg"> 
       </div>
 
+      <component
+        v-bind:avatars="avatars"
+        v-bind:is="avatarsWindow"></component>
+
       <div id="right-whole-height-block">
         <img id="mid-top-charater-bubble" src="./assets/bubble1.jpg">
+        <button
+          id="select-avatar"
+          v-on:click="avatarSelectionWindow">Avatar</button>
         <div id="user-input-form">
           <form action="/" method="post" id="username-and-room">  
+            <br>
             <label for="username">Username: </label>
             <input name="username" id="username" type="text" placeholder="username"></input>
             <br>
@@ -453,12 +474,76 @@
           this.$root.displayedComponent = 'usage';
         }
       }
-    })
+    });
+
+    Vue.component('avatar', {
+      props: ['source'],
+      template: '\
+        <div class="avatar">\
+          <img class="avatar-img" v-bind:src="sourceUrl">\
+        </div>\
+      ',
+      data: function() {
+        return {
+          sourceUrl: this.source
+        }
+      }
+    });
+
+    Vue.component('avatar-selection', {
+      props: ['avatars'],
+      template: '\
+        <div id="avatars-container">\
+          <avatar\
+            v-for="avatar in avatars"\
+            v-bind:key="avatar.sourceUrl"\
+            v-bind:source="avatar.sourceUrl"\
+          ></avatar>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          avatars: this.avatars
+        }
+      }
+    });
+
+    Vue.component('avatar-null', {
+      template: '\
+        <div id="avatars-null>\
+        </div>\
+      '
+    });
 
     let app = new Vue({
       el: '#app',
       data: {
-        displayedComponent: 'usage'
+        displayedComponent: 'usage',
+        displayedAvatars: 'null',
+        selectedAvatar: '',
+        avatars: [
+          {sourceUrl: './assets/avatars/avatar1.jpg'},
+          {sourceUrl: './assets/avatars/avatar2.jpg'},
+          {sourceUrl: './assets/avatars/avatar3.jpg'},
+          {sourceUrl: './assets/avatars/avatar4.jpg'},
+          {sourceUrl: './assets/avatars/avatar5.jpg'},
+          {sourceUrl: './assets/avatars/avatar6.jpg'},
+          {sourceUrl: './assets/avatars/avatar7.jpg'},
+          {sourceUrl: './assets/avatars/avatar8.jpg'},
+          {sourceUrl: './assets/avatars/avatar9.jpg'},
+          {sourceUrl: './assets/avatars/avatar10.jpg'},
+          {sourceUrl: './assets/avatars/avatar11.jpg'},
+          {sourceUrl: './assets/avatars/avatar12.jpg'}
+        ]
+      },
+      methods: {
+        avatarSelectionWindow: function() {
+          if(this.displayedAvatars == 'null') {
+            this.displayedAvatars = 'display';
+          } else if(this.displayedAvatars == 'display') {
+            this.displayedAvatars = 'null';
+          }
+        }
       },
       computed: {
         leftbuttomComponent: function() {
@@ -469,6 +554,16 @@
               return 'bottom-block-alternative-1';
             default: 
               return ''
+          }
+        },
+        avatarsWindow: function() {
+          switch(this.displayedAvatars) {
+            case 'null':
+              return 'avatar-null';
+            case 'display':
+              return 'avatar-selection';
+            default:
+              return '';
           }
         }
       },
