@@ -154,6 +154,33 @@
         /* border: solid; */
       }
 
+      #user-input-form-avatar-container {
+        position: absolute;
+        top: 1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 30%;
+        border: solid 2px;
+        border-radius: 20px;
+        overflow: hidden;
+      }
+
+      #user-input-form-avatar-container:hover {
+        border: solid 3px;
+      }
+
+      #user-input-form-avatar-selected {
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+      }
+
+      #avatar-url-label,
+      #avatar-url {
+        visibility: hidden;
+      }
+
       #username-and-room {
         position: absolute;
         top: 30%;
@@ -376,17 +403,28 @@
 
       <div id="right-whole-height-block">
         <img id="mid-top-charater-bubble" src="./assets/bubble1.jpg">
-        <button
-          id="select-avatar"
-          v-on:click="avatarSelectionWindow">Avatar</button>
+        <!--
+          <button
+            id="select-avatar"
+            v-on:click="avatarSelectionWindow">Avatar</button>
+        -->
         <div id="user-input-form">
+          <div 
+            v-on:click="avatarSelectionWindow"
+            id="user-input-form-avatar-container">
+            <img
+              v-bind:src="selectedAvatar"
+              id="user-input-form-avatar-selected">
+          </div>
           <form action="/" method="post" id="username-and-room">  
             <br>
             <label for="username">Username: </label>
-            <input name="username" id="username" type="text" placeholder="username"></input>
+            <input name="username" id="username" type="text" placeholder="username">
             <br>
             <label for="room ID">Room: </label>
-            <input name="roomId" id="roomId" type="text" placeholder="room ID"></input>
+            <input name="roomId" id="roomId" type="text" placeholder="room ID">
+            <label id="avatar-url-label" for="avatar Url">Avatar Url:</label>
+            <input name="avatar-url" id="avatar-url" type="text">
             <button id="join">Join/Create</button>
           </form>
         </div>
@@ -480,12 +518,45 @@
       props: ['source'],
       template: '\
         <div class="avatar">\
-          <img class="avatar-img" v-bind:src="sourceUrl">\
+          <img\
+            v-on:click="avatarSelected"\
+            class="avatar-img" v-bind:src="sourceUrl">\
         </div>\
       ',
       data: function() {
         return {
           sourceUrl: this.source
+        }
+      },
+      mounted: function() {
+        if(this.$root.selectedAvatarIndex !== 0) {
+          jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+            .css({'border': 'solid', 'border-radius': '25px'});
+        }
+      },
+      methods: {
+        avatarSelected: function() {
+          this.$root.selectedAvatar = this.source;
+
+          jQuery('#avatar-url').val(this.source);
+
+          console.log(this.$root.selectedAvatarIndex);
+
+          if(this.$root.selectedAvatarIndex !== 0) {
+            jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+              .css({'border': 'none'});
+          }
+
+          if(this.source.length == 29) {
+            let pos = parseInt(this.source[23]) * 10 + parseInt(this.source[24]);
+            this.$root.selectedAvatarIndex = pos;
+          } else if(this.source.length == 28) {
+            let pos = parseInt(this.source[23]);
+            this.$root.selectedAvatarIndex = pos;
+          }
+
+          jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+            .css({'border': 'solid', 'border-radius': '25px'});
         }
       }
     });
@@ -501,11 +572,6 @@
           ></avatar>\
         </div>\
       ',
-      data: function() {
-        return {
-          avatars: this.avatars
-        }
-      }
     });
 
     Vue.component('avatar-null', {
@@ -520,7 +586,8 @@
       data: {
         displayedComponent: 'usage',
         displayedAvatars: 'null',
-        selectedAvatar: '',
+        selectedAvatar: './assets/avatars/avatarNull.jpg',
+        selectedAvatarIndex: 0,
         avatars: [
           {sourceUrl: './assets/avatars/avatar1.jpg'},
           {sourceUrl: './assets/avatars/avatar2.jpg'},
