@@ -1,60 +1,710 @@
 <!DOCTYPE html>
 <html lang='en'>
-    <head>
-        <meta http-equiv="Content-Type" content="text/html"; charset="UTF-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
-        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-        <title>Things Front Page</title>
-    </head>
-    <body>
-        <form action="/" method="post">
-                <label for="username">Username: </label>
-                <input name="username" id="username" type="text" placeholder="username"></input>
-                <br>
-                <label for="room ID">Room: </label>
-                <input name="roomId" id="roomId" type="text" placeholder="room ID"></input>
-                <button id="join">Join/Create</button>
-            <pre id="output"></pre>
-        </form>
-                
- 
-        <script type="text/javascript">
-            // This outputs a list object, but doesnt populate an auto-complete
-            /*
-            $('#roomId').on('input', function(){
-                $.ajax({
-                    'type': 'GET',
-                    'url': 'suggestrooms?roomList=' + $('#roomId').val(),
-                    'success':function(data){
-                        console.log(JSON.stringify(data));
-                        readData = JSON.stringify(data);
-                        parseData = JSON.parse(readData);
-                        //strData = readData;
-                        console.log(parseData);
-                        strData = parseData.join("\n");
-                        $('#output').text(strData);
-                    }
-                })
-            })*/
+  <head>
+    <meta http-equiv="Content-Type" content="text/html" charset="UTF-8"/>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+      
+    <script type="text/javascript" src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/velocity/1.2.3/velocity.min.js"></script>
+     
+    <link href='https://fonts.googleapis.com/css?family=Kaushan Script' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Shadows Into Light' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Sniglet' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Kalam' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Handlee' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Shadows Into Light Two' rel='stylesheet'>
 
-            // jquery-ui method for auto-complete
-            $("#roomId")
-            .autocomplete({
-                source: function(req,res){
-                    $.ajax({
-                    'type': 'GET',
-                    'url': 'suggestrooms?roomList=' + $('#roomId').val(),
-                    data: {
-                        roomList: req.roomList
-                    },
-                    success: function(data){
-                        res(data);
-                    },
-                                      
-                    });
-                }
-            })
-        </script>
-    </body>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <title>Things Front Page</title>
+
+    <style>
+      html, body {
+        padding: 0px;
+        margin: 0px;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+      }
+
+      #app {
+        position: relative;
+        padding: 0px;
+        margin: 0px;
+        width: 100%;
+        height: 100%;
+      }
+
+      #right-side-panel {
+        padding: 0px;
+        margin: 0px;
+        width: 30%;
+        height: 99.3%;
+        right: 1px;
+        position: absolute;
+        /* border: solid; */
+      }
+
+      #title {
+        font-family: 'Kaushan Script';
+        font-size: 35px;
+        position: absolute;
+        left: 10%;
+        top: 2%;
+      }
+
+      #title-things {
+        font-size: 80px;
+        position: absolute;
+        left: 50%;
+        top: 3%;
+      }
+
+      #left-top-block {
+        position: absolute;
+        top: 1px;
+        left: 0px;
+        height: 40%;
+        width: 45%;
+        border-bottom: solid;
+        border-right: solid;
+      }
+
+      #mid-top-block {
+        position: absolute;
+        top: 1px;
+        left: 46%;
+        height: 40%;
+        width: 25%;
+        border-left: solid;
+        border-bottom: solid;
+        border-right: solid;
+      }
+
+      #right-whole-height-block {
+        position: absolute;
+        top: 1px;
+        left: 72%;
+        height: 100%;
+        width: 28%;
+        border-left: solid;
+        overflow: visible;
+      }
+
+      #bottom-block {
+        position: absolute;
+        bottom: 0px;
+        width: 71%;
+        height: 58%;
+        border-top: solid;
+        border-right: solid;
+      }
+
+      #bg-title {
+        width: 100%;
+        height: 100%;
+        object-fit:fill;
+      }
+
+      #title-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-family: 'Kaushan Script';
+        font-size: 35px;
+      }
+
+      #title-text-things {
+        font-family: 'Kaushan Script';
+        font-size: 70px;  
+      }
+
+      #mid-top-character {
+        width: 100%;
+        height: 100%;
+        object-fit: scale-down;
+      }
+
+      #mid-top-charater-bubble {
+        position: absolute;
+        top: 5%;
+        z-index: -1;
+        width: 100%;
+        height: 60%;
+        transform: scale(0.9, 1.2);
+        object-fit: scale-down;
+      }
+
+      #user-input-form {
+        position: absolute;
+        top: 18%;
+        left: 55%;
+        transform: translateX(-50%);
+        width: 30%;
+        height: 30%;
+        /* border: solid; */
+      }
+
+      #user-input-form-avatar-container {
+        position: absolute;
+        top: 1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 30%;
+        border: solid 2px;
+        border-radius: 20px;
+        overflow: hidden;
+      }
+
+      #user-input-form-avatar-container:hover {
+        border: solid 3px;
+      }
+
+      #user-input-form-avatar-selected {
+        width: 100%;
+        height: 100%;
+        object-fit: fill;
+      }
+
+      #avatar-url-label,
+      #avatar-url {
+        visibility: hidden;
+      }
+
+      #username-and-room {
+        position: absolute;
+        top: 30%;
+      }
+
+      #output {
+        position: absolute;
+        top: 60%;
+      }
+
+      #bg-usage {
+        object-fit:fill;
+        width: 100%;
+        height: 100%;
+      }
+
+      #usage-text {
+        position: absolute;
+        width: 50%;
+        height: 60%;
+        top: 9%;
+        left: 22%;
+        /* border: solid; */
+        font-family: 'Kalam';
+        font-size: 22px;
+      }
+
+      #usage-text p {
+        margin: 3px;
+      }
+
+      #usage-text-title {
+        font-size: 33px;
+      }
+
+      #bottom-block-alternative-1 {
+        position: absolute;
+        bottom: 1px;
+        width: 71%;
+        height: 58%;
+        padding: 0px;
+      }
+
+      #bottom-block-alternative-1-1 {
+        position: absolute;
+        width: 49%;
+        height: 100%;
+        left: 0px;
+        border-top: solid;
+        border-right: solid;
+        margin: 0px;
+        top: 0px;
+      }
+
+      #bottom-block-alternative-1-1-img {
+        position: absolute;
+        width: 60%;
+        height: 60%;
+        object-fit: cover;
+        bottom: 2px;
+        left: 1px;;
+      }
+
+      #buttom-block-alternative-1-1-bubble {
+        position: absolute;
+        width: 80%;
+        height: 40%;
+        left: 8%;
+        top: 2%;
+        object-fit: fill;
+        z-index: 1;
+      }
+
+      #bottom-block-alternative-1-text {
+        position: absolute;
+        left: 18%;
+        top: 15%;
+        z-index: 2;
+        font-family: 'Handlee';
+        font-size: 27px;
+        transform: rotate(-3deg);
+      }
+
+      #bottom-block-alternative-1-2 {
+        position: absolute;
+        width: 50%;
+        height: 100%;
+        left: 50%;
+        border-top: solid;
+        border-right: solid;
+        border-left: solid;
+        margin: 0px;
+        top: 0px;
+        background-image: url("https://storage.googleapis.com/studydsstore/1552258880202bg_alternative1.jpg");
+        background-size: cover;
+        overflow: hidden;
+      }
+
+      #buttom-block-alternative-1-2-bubble-1 {
+        position: absolute;
+        width: 70%;
+        height: 26%;
+        left: 16%;
+        top: 5%;
+        object-fit: scale-down;
+      }
+
+      #buttom-block-alternative-1-2-bubble-2 {
+        position: absolute;
+        width: 70%;
+        height: 26%;
+        left: 26%;
+        top: 35%;
+        object-fit: scale-down;
+      }
+
+      #buttom-block-alternative-1-2-bubble-3 {
+        position: absolute;
+        width: 70%;
+        height: 26%;
+        left: 19%;
+        top: 65%;
+        object-fit: scale-down;
+      }
+
+      #bottom-block-alternative-1-2-answer-1 {
+        position: absolute;
+        font-size: 23px;
+        font-family: 'Shadows Into Light Two';
+        top: 11%;
+        left: 40%;
+        z-index: 2;
+      }
+
+      #bottom-block-alternative-1-2-answer-2 {
+        position: absolute;
+        font-size: 23px;
+        font-family: 'Shadows Into Light Two';
+        top: 41%;
+        left: 45%;
+        z-index: 2;
+      }
+
+      #bottom-block-alternative-1-2-answer-3 {
+        position: absolute;
+        font-size: 23px;
+        font-family: 'Shadows Into Light Two';
+        top: 68%;
+        left: 40%;
+        z-index: 2;
+        width: 30%;
+      }
+
+      #avatars-null {
+        position: absolute;
+        width: 50%;
+        height: 50%;
+        left: 20%;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+      }
+
+      #avatars-container {
+        position: absolute;
+        border: solid;
+        flex-wrap: wrap;
+        display: flex;
+        background-color: white;
+        width: 71%;
+        height: 80%;
+        left: 0px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3; 
+      }
+
+      .avatar {
+        display: flex;
+        justify-content: space-around;
+        width: 22%;
+        height: 22%;
+        margin: 10px;
+      }
+
+      .avatar-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .component-fade-enter-active, .component-fade-leave-active {
+        transition: opacity 1.5s ease;
+      }
+      
+      .component-fade-enter, .component-fade-leave-to {
+        opacity: .0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="left-top-block">
+        <img id="bg-title" src="https://storage.googleapis.com/studydsstore/1552259308495title_border.jpg">
+        <div id="title-text">
+          <p>
+            The game of<br>
+            <span id="title-text-things">things</span>
+          </p>
+        </div>
+      </div>
+
+      <div id="mid-top-block">
+        <img id="mid-top-character" src="https://storage.googleapis.com/studydsstore/1552259258234frontpage_img_2.jpg"> 
+      </div>
+
+      <component
+        v-bind:avatars="avatars"
+        v-bind:is="avatarsWindow"></component>
+
+      <div id="right-whole-height-block">
+        <img id="mid-top-charater-bubble" src="https://storage.googleapis.com/studydsstore/1552259236528bubble1.jpg">
+        <!--
+          <button
+            id="select-avatar"
+            v-on:click="avatarSelectionWindow">Avatar</button>
+        -->
+        <div id="user-input-form">
+          <div 
+            v-on:click="avatarSelectionWindow"
+            id="user-input-form-avatar-container">
+            <img
+              v-bind:src="selectedAvatar"
+              id="user-input-form-avatar-selected">
+          </div>
+          <form action="/" method="post" id="username-and-room">  
+            <br>
+            <label for="username">Username: </label>
+            <input name="username" id="username" type="text" placeholder="username">
+            <br>
+            <label for="room ID">Room: </label>
+            <input name="roomId" id="roomId" type="text" placeholder="room ID">
+            <label id="avatar-url-label" for="avatar Url">Avatar Url:</label>
+            <input name="avatar-url" id="avatar-url" type="text">
+            <button id="join">Join/Create</button>
+          </form>
+        </div>
+        <pre id="output"></pre>
+      </div>
+
+      <transition name="component-fade" mode="out-in">
+          <component
+            v-bind:is="leftbuttomComponent"></component>
+      </transition>
+    </div>
+  </body>   
+  <script type="text/javascript">
+    // This outputs a list object, but doesnt populate an auto-complete
+    /*
+    $('#roomId').on('input', function() {
+      $.ajax({
+        'type': 'GET',
+        'url': 'suggestrooms?roomList=' + $('#roomId').val(),
+        'success':function(data){
+        console.log(JSON.stringify(data));
+        readData = JSON.stringify(data);
+        parseData = JSON.parse(readData);
+        //strData = readData;
+        console.log(parseData);
+        strData = parseData.join("\n");
+        $('#output').text(strData);
+      }
+    })
+    )*/
+
+    Vue.component('bottom-block', {
+      props: [],
+      template: '\
+        <div id="bottom-block">\
+          <img id="bg-usage" src="https://storage.googleapis.com/studydsstore/1552259223162bg_usage.jpg">\
+          <div id="usage-text">\
+            <p id="usage-text-title">\
+              Game Instruction\
+            </p>\
+            <p>\
+              All players submit an answer to a card.\
+            </p>\
+            <p>\
+              One of them is picked to start with one guess. If guessed right, it get to guess again.\
+              Otherwise the next person get a turn.\
+            </p>\
+            <p>\
+              If someone matches you to your answer, you are out of the round.\
+            </p>\
+          </div>\
+        </div>\
+      ', 
+    });
+
+    Vue.component('bottom-block-alternative-1', {
+      props: [],
+      template: '\
+        <div id="bottom-block-alternative-1">\
+          <div id="bottom-block-alternative-1-1">\
+            <img id="buttom-block-alternative-1-1-bubble" src="https://storage.googleapis.com/studydsstore/1552259297421rectangle_bubble.jpg">\
+            <img id="bottom-block-alternative-1-1-img" src="https://storage.googleapis.com/studydsstore/1552259249003frontpage_img_1.jpg">\
+            <p id="bottom-block-alternative-1-text">\
+              Things... you hope for in 2019.\
+            </p>\
+          </div>\
+          <div id="bottom-block-alternative-1-2">\
+            <img id="buttom-block-alternative-1-2-bubble-1" src="https://storage.googleapis.com/studydsstore/1552259284708rectangle_box.jpg">\
+            <img id="buttom-block-alternative-1-2-bubble-2" src="https://storage.googleapis.com/studydsstore/1552259284708rectangle_box.jpg">\
+            <img id="buttom-block-alternative-1-2-bubble-3" src="https://storage.googleapis.com/studydsstore/1552259284708rectangle_box.jpg">\
+            <p id="bottom-block-alternative-1-2-answer-1">\
+              World peace\
+            </p>\
+            <p id="bottom-block-alternative-1-2-answer-2">\
+              peace and quiet\
+            </p>\
+            <p id="bottom-block-alternative-1-2-answer-3">\
+              I\'d settle for a piece of cake\
+            </p>\
+          </div>\
+        </div>\
+      ',
+      methods: {
+        switchComponent: function() {
+          this.$root.displayedComponent = 'usage';
+        }
+      }
+    });
+
+    Vue.component('avatar', {
+      props: ['source'],
+      template: '\
+        <div class="avatar">\
+          <img\
+            v-on:click="avatarSelected"\
+            class="avatar-img" v-bind:src="sourceUrl">\
+        </div>\
+      ',
+      data: function() {
+        return {
+          sourceUrl: this.source
+        }
+      },
+      mounted: function() {
+        if(this.$root.selectedAvatarIndex !== 0) {
+          jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+            .css({'border': 'solid', 'border-radius': '25px'});
+        }
+      },
+      methods: {
+        avatarSelected: function() {
+          this.$root.selectedAvatar = this.source;
+
+          jQuery('#avatar-url').val(this.source);
+
+          console.log(this.$root.selectedAvatarIndex);
+
+          if(this.$root.selectedAvatarIndex !== 0) {
+            jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+              .css({'border': 'none'});
+          }
+
+          if(this.source.length == 69) {
+            let pos = parseInt(this.source[63]) * 10 + parseInt(this.source[64]);
+            this.$root.selectedAvatarIndex = pos;
+          } else if(this.source.length == 68) {
+            let pos = parseInt(this.source[63]);
+            this.$root.selectedAvatarIndex = pos;
+          }
+
+          jQuery(`.avatar:eq(${this.$root.selectedAvatarIndex - 1})`)
+            .css({'border': 'solid', 'border-radius': '25px'});
+        }
+      }
+    });
+
+    Vue.component('avatar-selection', {
+      props: ['avatars'],
+      template: '\
+        <div id="avatars-container">\
+          <avatar\
+            v-for="avatar in avatars"\
+            v-bind:key="avatar.sourceUrl"\
+            v-bind:source="avatar.sourceUrl"\
+          ></avatar>\
+        </div>\
+      ',
+    });
+
+    Vue.component('avatar-null', {
+      template: '\
+        <div id="avatars-null>\
+        </div>\
+      '
+    });
+
+    let app = new Vue({
+      el: '#app',
+      data: {
+        displayedComponent: 'usage',
+        displayedAvatars: 'null',
+        selectedAvatar: 'https://storage.googleapis.com/studydsstore/1552260864645avatarNull.jpg',
+        selectedAvatarIndex: 0,
+        avatars: [
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259331119avatar2.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259339227avatar3.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259348691avatar4.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259388648avatar5.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259397380avatar6.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259405930avatar7.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259413754avatar8.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259423593avatar9.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259431834avatar10.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259439502avatar11.jpg'},
+          {sourceUrl: 'https://storage.googleapis.com/studydsstore/1552259448617avatar12.jpg'}
+        ]
+      },
+      methods: {
+        avatarSelectionWindow: function() {
+          if(this.displayedAvatars == 'null') {
+            this.displayedAvatars = 'display';
+          } else if(this.displayedAvatars == 'display') {
+            this.displayedAvatars = 'null';
+          }
+        }
+      },
+      computed: {
+        leftbuttomComponent: function() {
+          switch(this.displayedComponent) {
+            case 'usage':
+              return 'bottom-block';
+            case 'process':
+              return 'bottom-block-alternative-1';
+            default: 
+              return ''
+          }
+        },
+        avatarsWindow: function() {
+          switch(this.displayedAvatars) {
+            case 'null':
+              return 'avatar-null';
+            case 'display':
+              return 'avatar-selection';
+            default:
+              return '';
+          }
+        }
+      },
+    });
+
+    setInterval(function() {
+        jQuery('#buttom-block-alternative-1-1-bubble')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 1000, duration: 1000});
+    
+        jQuery('#bottom-block-alternative-1-text')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 1000, duration: 1000});
+
+        jQuery('#buttom-block-alternative-1-2-bubble-1')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 2000, duration: 1000});
+        
+        jQuery('#bottom-block-alternative-1-2-answer-1')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 2000, duration: 1000});
+
+        jQuery('#buttom-block-alternative-1-2-bubble-2')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 3000, duration: 1000});
+        
+        jQuery('#bottom-block-alternative-1-2-answer-2')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 3000, duration: 1000});
+
+        jQuery('#buttom-block-alternative-1-2-bubble-3')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 4000, duration: 1000});
+        
+        jQuery('#bottom-block-alternative-1-2-answer-3')
+          .velocity("fadeOut", {duration: 0})
+          .velocity("fadeIn", {delay: 4000, duration: 1000});
+    }, 5000);
+    
+    
+    let switchComponent = function() {
+      console.log(app.displayedComponent);
+      if(app.displayedComponent == 'usage') {
+        app.displayedComponent = 'process';
+      } 
+      else {
+        app.displayedComponent = 'usage';
+      } 
+    }
+
+    setInterval(switchComponent, 10000);
+
+    // jquery-ui method for auto-complete
+    $("#roomId")
+      .autocomplete({
+        source: function(req,res) {
+          $.ajax({
+            'type': 'GET',
+            'url': 'suggestrooms?roomList=' + $('#roomId').val(),
+            data: {
+              roomList: req.roomList
+            },
+            success: function(data) {
+              res(data);
+            },                       
+          });
+        }
+      });
+
+    jQuery(function() {
+      let socket = io();
+
+      jQuery('#join').on('click', function() {
+        console.log('????');
+        socket.emit('user connection', {
+          username: jQuery('#username').val()
+        });
+      });
+    });
+  </script>
 </html>

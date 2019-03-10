@@ -1,0 +1,629 @@
+<!--
+  (TODO)
+  1. Figure out the left status bar: game logo, players' status, personal points...
+-->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html"; charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+    
+    <script type="text/javascript" src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.slim.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue-socket.io-extended"></script>
+
+    <title>The game of things</title>
+
+    <style>
+      html, body {
+        min-height: 100%;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+
+      /*
+      #app {
+        border: solid;
+        position: absolute;
+        right: 1px;
+        width: 70%;
+        height: 90%;
+      }
+      */
+
+      #main-panel {
+        border: solid;
+        position: absolute;
+        right: 1px;
+        width: 70%;
+        height: 90%;
+      }
+
+      #status-panel {
+        border: solid;
+        position: absolute;
+        left: 1px;
+        width: 29%;
+        height: 90%;
+      }
+
+      #control-panel {
+        position: absolute;
+        bottom: 1px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      player-in-room {
+        width: 100%;
+      }
+
+      #players-in-room {
+        position: absolute;
+        width: 100%;
+        top: 30%;
+        left: 1px;
+      }
+
+      #players-list {
+        padding: 0px;
+        left: 50%;
+      }
+
+      #players-list div {
+        margin-bottom: 2px;
+      }
+
+      #cards {
+        list-style-type: none; 
+        margin: 0; 
+        padding: 0;
+      }
+
+      #cards li { 
+        padding: 5px 10px; 
+      }
+
+      .card-container {
+        position: relative;
+        border: solid;
+        height: 50px;
+        width: 200px;
+        margin-bottom: 2px;
+      }
+
+      .lists-container {
+        position: relative;
+        margin: 0%;
+      }
+
+      .avatar-list-container {
+        position: absolute;
+        border: solid;
+        width: 30%;
+        top: 1%;
+        overflow: hidden;
+      }
+
+      .answer-list-container {
+        position: absolute;
+        border: solid;
+        width: 68%;
+        top: 1%;
+        left: 31%;
+        overflow: hidden;
+      }
+
+      .flip-list-move {
+        transition: transform 1s;
+      } 
+
+      .flip-list-enter-active, .flip-list-leave-active {
+        transition: all 1s;
+      }
+      
+      .flip-list-enter, .flip-list-leave-to {
+        /* .flip-list-leave-active below version 2.1.8 */ 
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      .component-fade-enter-active, .component-fade-leave-active {
+        transition: opacity .5s ease;
+      }
+      
+      .component-fade-enter, .component-fade-leave-to {
+        /* .component-fade-leave-active below version 2.1.8 */ 
+        opacity: .0;
+      }
+
+      .player-info {
+        border: solid;
+        width: 80%;
+        padding-left: 20px;
+        margin-left: 10px; 
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="status-panel">
+        <players-in-room
+          v-bind:players="playersInRoom"></players-in-room>
+      </div>
+
+      <div id="main-panel">
+        <transition name="component-fade" mode="out-in">
+          <component
+            v-bind:is="displayMode"
+            v-bind:current-player="currentPlayer"
+            v-bind:users="submittedUsers"
+            v-bind:answers="submittedAnswers"
+            v-bind:cards="submittedCards"></component>
+        </transition>
+
+        <div id="control-panel">
+        <component
+          v-bind:is="inputMode"
+          v-bind:guess="guessedResult"
+          v-bind:current-player="currentPlayer"
+          v-bind:key="currentPlayer.username"
+          v-on:submit-answer="submitAnswer"
+          v-on:submit-guessed-match="submitGuessedMatch"></component>
+
+        <button
+          v-for="mode in gameModes"
+          v-bind:key="mode"
+          v-on:click="gameModeTransition(mode)">{{ mode }}</button>  
+        </div>
+      </div>
+
+      <input 
+        id="username" 
+        v-model="currentPlayer.username" 
+        style="position:relative;">
+    </div>
+  </body>
+  <script type="text/javascript">
+    // The components for the out-of-round stage:
+    // - avatar list          "avatar-list"
+    // - answer list          "answer-list"
+    // - card display window  "card-window"
+    // - out of round status bar  "out-of-round-form"
+    Vue.component('avatar-list', {
+      props: ['avatar'],
+      template: '\
+        <div>\
+          <p>\
+            {{ avatar.username }}\
+          </p>\
+        </div>\
+      '
+    });
+
+    Vue.component('answer-list', {
+      props: ['answer'],
+      template: '\
+        <div>\
+          <p>\
+            {{ answer.useranswer }}\
+          </p>\
+        </div>\
+      '
+    });
+
+    Vue.component('out-of-round-form', {
+      props: [],
+      template: '\
+        <div>\
+          <p>\
+            You\'re out of round!\
+          </p>\
+        </div>\
+      '
+    });
+
+    Vue.component('card-window', {
+      props: ['cards'],
+      template: '\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <ul id="avatars">\
+              <avatar-list\
+                v-for="card in cards"\
+                v-bind:avatar="card"\
+              ></avatar-list>\
+            </ul>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <ul id="answers">\
+              <answer-list\
+                v-for="card in cards"\
+                v-bind:answer="card"\
+              ></answer-list>\
+            </ul>\
+          </div>\
+        \
+        </div>\
+      ',
+    });
+
+
+    // The components for the guessing stage:
+    // - avatar list          "guess-avatar-list"
+    // - answer list          "guess-answer-list"
+    // - answer input form    "guess-form"
+    // - card display window  "guess-window"
+    Vue.component('guess-avatar-list', {
+      props: ['avatar'],
+      template: '\
+        <div\
+          v-on:click=\"globalEmitUsernameSelected\">\
+          <p>\
+            {{ avatar.username }}\
+          </p>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          username: this.avatar
+        }
+      },
+      methods: {
+        globalEmitUsernameSelected: function() {
+          this.$root.guessedResult.username = this.avatar.username;
+          EventBus.$emit('guessed-username', this.avatar);
+        }
+      }
+    });
+
+    Vue.component('guess-answer-list', {
+      props: ['answer'],
+      template: '\
+        <div\
+          v-on:click=\"globalEmitAnswerSelected\">\
+          <p>\
+            {{ answer.useranswer }}\
+          </p>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          useranswer: this.answer
+        }
+      },
+      methods: {
+        globalEmitAnswerSelected: function() {
+          this.$root.guessedResult.useranswer = this.answer.useranswer;
+          EventBus.$emit('guessed-answer', this.answer);
+        }
+      }
+    });
+
+    Vue.component('guess-form', {
+      props: ['guess'],
+      template: '\
+        <div>\
+          <p>\
+            <span>\
+              {{ guess.username }} said {{ guess.useranswer }}\
+            </span>\
+            <button v-on:click=\"$emit(\'submit-guessed-match\')\">\
+              Match\
+            </button>\
+          </p>\
+        </div>\
+      ',
+    });
+
+    Vue.component('guess-window', {
+      props: ['users', 'answers'],
+      template: '\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <transition-group name=\"flip-list\" tag=\"ul\">\
+                <guess-avatar-list\
+                  v-for="user in users"\
+                  v-bind:avatar="user"\
+                  v-bind:key="user.username"\
+                ></guess-avatar-list>\
+            </transition-group>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <transition-group name=\"flip-list\" tag=\"ul\">\
+              <guess-answer-list\
+                v-for="answer in answers"\
+                v-bind:answer="answer"\
+                v-bind:key="answer.useranswer"\
+              ></guess-answer-list>\
+            </transition-group>\
+          </div>\
+        \
+        </div>\
+      ',
+    });
+
+
+    // The components for the answering stage
+    // - avatar list          "avatar-list"
+    // - answer list          "invisible-answer-list"
+    // - card display window  "answer-window"
+    // - answer input form    "input-form"
+    Vue.component('invisible-answer-list', {
+      props: ['card', 'current-player'],
+      template: '\
+        <div>\
+          <p>\
+            {{ displayedAnswer }}\
+          </p>\
+        </div>\
+      ',
+      computed: {
+        displayedAnswer: function() {
+          // console.log(this.card);
+          return this.card.username == this.currentPlayer.username 
+            ? this.card.useranswer : '?';
+        }
+      }
+    });
+
+    Vue.component('answer-window', {
+      props: ['cards', 'current-player'],
+      template: '\
+        <div id="lists-container">\
+        \
+          <div class="avatar-list-container">\
+            <ul id="avatars">\
+              <avatar-list\
+                v-for="card in cards"\
+                v-bind:avatar="card"\
+              ></avatar-list>\
+            </ul>\
+          </div>\
+        \
+          <div class="answer-list-container">\
+            <ul id="answers">\
+              <invisible-answer-list\
+                v-for="card in cards"\
+                v-bind:card="card"\
+                v-bind:current-player="currentPlayer"\
+              ></invisible-answer-list>\
+            </ul>\
+          </div>\
+        \
+        </div>\
+      ',
+    });
+
+    //  <input id=\"username-input\" v-model=\"user.username\">\
+
+    Vue.component('input-form', {
+      props: ['input_msg', 'current-player'],
+      template: '\
+        <div>\
+          <br>\
+          <p>\
+            {{ currentPlayer.username }}\'s answer for the question is {{ user.userinput }}\
+          </p>\
+          <input id=\"answer-input\" v-model=\"user.userinput\">\
+          <button v-on:click=\"$emit(\'submit-answer\', user)\">\
+            Enter\
+          </button>\
+        </div>\
+      ',
+      data: function() {
+        return {
+          user: {
+            username: this.currentPlayer.username,
+            userinput: ''
+          }
+        };
+      }
+    });
+
+
+    // The components for the left status panel
+    Vue.component('player-info', {
+      props: ['player'],
+      template: '\
+        <div class="player-info">\
+          <p>\
+            Player: {{ player.username }}\
+          </p>\
+        </div>\
+      '
+    });
+
+    Vue.component('players-in-room', {
+      props: ['players'],
+      template: '\
+        <div id="players-in-room">\
+          <ul id="players-list">\
+            <player-info\
+              v-for="p in players"\
+              v-bind:player="p"\
+            ></player-info>\
+          </ul>\
+        </div>\
+      '
+    });
+
+
+
+    // The event bus handling the global page's events 
+    const EventBus = new Vue();
+
+    // vue-socket.io-extended set up
+    Vue.use(VueSocketIOExt, io('http://localhost:3000'));
+
+    // The top level component: app
+    let app = new Vue({
+      el: '#app',
+      data: {
+        // current player
+        currentPlayer: {
+          // assume that the players are identified by their names
+          username: '', 
+        },
+        // the players' info in current room
+        playersInRoom: [
+          // an array of player objects
+          {username: 'player1'},
+          {username: 'player2'},
+          {username: 'player3'},
+        ],
+        // the user infos for having submitted answer
+        submittedCards: [
+          {
+            username: 'player1',
+            useranswer: 'answer1'
+          },
+          {
+            username: 'player2',
+            useranswer: 'answer2'
+          },
+          {
+            username: 'player3',
+            useranswer: 'answer3'
+          },
+        ],
+        // separated two lists for shuffling in guessing stage
+        submittedUsers: [
+          {username: 'player1'},
+          {username: 'player2'},
+          {username: 'player3'},
+        ],
+        // the answers of the users
+        submittedAnswers: [
+          {useranswer: 'answer1'},
+          {useranswer: 'answer2'},
+          {useranswer: 'answer3'},
+        ],
+        // current mode of the game, default (initial) is answering
+        currentGameMode: 'answer',
+        // game mode: currently there are two: answering and guessing
+        gameModes: [
+          'answer',
+          'guess',
+          'out of round'
+        ],
+        // the results of the guessing (name matches answer)
+        guessedResult: {
+          username: '',
+          useranswer: '',
+        },
+        input_msg: ''
+      },
+      methods: {
+        submitAnswer: function(answer) {
+          console.log(answer.username + '......' + answer.userinput);
+          this.submittedUsers.push({username: answer.username});
+          this.submittedAnswers.push({useranswer: answer.userinput});
+          this.submittedCards.push({
+            username: answer.username,
+            useranswer: answer.userinput
+          })
+        },
+        submitGuessedMatch: function() {
+          let username = this.guessedResult.username;
+          let useranswer = this.guessedResult.useranswer;
+          let removedSubmittedCards = [];
+          let matched = false;
+
+          console.log(this.guessedResult);
+
+          this.submittedCards = this.submittedCards.filter(function(card) {
+            if((card.username !== username) || (card.useranswer !== useranswer)) {
+              return true;
+            } else {
+              matched = true;
+              return false;
+            }
+          });
+
+          if(matched) {
+            this.submittedUsers = this.submittedUsers.filter(function(card) {
+              return card.username !== username;
+            });
+
+            let hasRemoved = false;
+            this.submittedAnswers = this.submittedAnswers.filter(function(card) {
+              if(!hasRemoved && card.useranswer === useranswer) {
+                hasRemoved = true;
+                return false;
+              } else {
+                return true;
+              }
+            });
+          }
+        },
+        gameModeTransition: function(mode) {
+          if(mode === 'guess') {
+            this.shuffle();
+          }
+          this.currentGameMode = mode;
+        },
+        shuffle: function() {
+          for(let ii = this.submittedAnswers.length - 1; ii > 0; ii--) {
+            let randomIndex = Math.floor(Math.random() * ii);
+
+            let temp = this.submittedAnswers[ii];
+            Vue.set(this.submittedAnswers, ii, this.submittedAnswers[randomIndex]);
+            Vue.set(this.submittedAnswers, randomIndex, temp);
+          }
+        }
+      },
+      computed: {
+        inputMode: function() {
+          switch(this.currentGameMode) {
+            case 'answer': 
+              return 'input-form';
+            case 'guess':
+              return 'guess-form';
+            case 'out of round':
+              return 'out-of-round-form';
+            default: 
+              return 'unknown: currentGameMode error';
+          }
+        },
+        displayMode: function() {
+          switch(this.currentGameMode) {
+            case 'answer': 
+              return 'answer-window';
+            case 'guess':
+              return 'guess-window';
+            case 'out of round':
+              return 'card-window';
+            default: 
+              return 'unknown: currentGameMode error';
+          }
+        }
+      },
+      // handle all the events sent from server side
+      sockets: {
+        playerJoin: function(data) {
+          this.currentPlayer.username = data.username;
+          app.playersInRoom.push({username: data.username});
+        }
+      }
+    }); 
+
+    EventBus.$on('guessed-username', function(username) {
+      console.log(`received user selected name ${username.username}`);
+      app.guessedResult.username = username.username;
+    });
+
+    EventBus.$on('guessed-answer', function(answer) {
+      console.log(`received user selected name ${answer.useranswer}`);
+      app.guessedResult.useranswer = answer.useranswer;
+    });
+  </script>
+</html>
