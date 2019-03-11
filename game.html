@@ -472,17 +472,18 @@
         currentPlayer: {
           // assume that the players are identified by their names
           username: '', 
+          userId: undefined
         },
         // the players' info in current room
         playersInRoom: [
           // an array of player objects
-          {username: 'player1'},
-          {username: 'player2'},
-          {username: 'player3'},
+          //{username: 'player1'},
+          //{username: 'player2'},
+          //{username: 'player3'},
         ],
         // the user infos for having submitted answer
         submittedCards: [
-          {
+          /*{
             username: 'player1',
             useranswer: 'answer1'
           },
@@ -493,19 +494,19 @@
           {
             username: 'player3',
             useranswer: 'answer3'
-          },
+          },*/
         ],
         // separated two lists for shuffling in guessing stage
         submittedUsers: [
-          {username: 'player1'},
+          /*{username: 'player1'},
           {username: 'player2'},
-          {username: 'player3'},
+          {username: 'player3'},*/
         ],
         // the answers of the users
         submittedAnswers: [
-          {useranswer: 'answer1'},
+          /*{useranswer: 'answer1'},
           {useranswer: 'answer2'},
-          {useranswer: 'answer3'},
+          {useranswer: 'answer3'},*/
         ],
         // current mode of the game, default (initial) is answering
         currentGameMode: 'answer',
@@ -530,7 +531,12 @@
           this.submittedCards.push({
             username: answer.username,
             useranswer: answer.userinput
-          })
+          });
+          this.$socket.emit('answer', {
+            userId: this.currentPlayer.userId,
+            username: answer.username,
+            answer: answer.userinput
+          });
         },
         submitGuessedMatch: function() {
           let username = this.guessedResult.username;
@@ -610,8 +616,62 @@
       // handle all the events sent from server side
       sockets: {
         playerJoin: function(data) {
-          this.currentPlayer.username = data.username;
-          app.playersInRoom.push({username: data.username});
+          console.log(`received from server playerJoin:  
+            ${data.username}    ${data.roomId}`);
+
+          if(this.currentPlayer.userId === undefined || 
+             this.currentPlayer.userId === '') {
+            if(data.username !== undefined && data.roomId !== undefined) {
+              this.currentPlayer.username = data.username;
+              this.currentPlayer.userId = data.userId;
+
+              this.$socket.emit('playerJoin', {
+                username: data.username,
+                userId: data.userId,
+                roomId: data.roomId
+              });
+            }
+          } 
+
+          let inGame = false;
+          for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
+            if(this.playersInRoom[ii].userId == data.userId)
+              inGame = true;
+          }
+
+          if(!inGame && data.username !== undefined && data.roomId !== undefined) {
+            app.playersInRoom.push({
+              username: data.username,
+              userId: data.userId
+            });
+          }
+        },
+        playerLeave: function(data) {
+          console.log(`received from server playerLeave:  
+            ${data.username}    ${data.roomId}`);
+
+          this.playersInRoom = this.playersInRoom.filter(function(player) {
+            if(player.username == data.username) {
+              console.log(`Removed player in playerlist ${player.username}`);
+              return false;
+            } else {
+              return true;
+            }
+          });
+        },
+        answer: function(data) {
+          if(data.userId != this.currentPlayer.userId) {
+            this.submittedCards.push({
+              username: data.username,
+              useranswer: data.answer  
+            });
+            this.submittedAnswers.push({
+              useranswer: data.answer
+            });
+            this.submittedUsers.push({
+              username: data.username 
+            });
+          }
         }
       }
     }); 

@@ -134,7 +134,7 @@ app.post('/', function(req,res){
         console.log('false')
         req.params.roomId = newRoom();
     }
-
+    req.session.roomId = req.params.roomId;
     //res.status(200);
     //res.contentType('text/html');
     //res.write('room number generated: '+ JSON.stringify(req.body, null, 2));
@@ -197,9 +197,21 @@ io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
+    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);
 
     io.emit('playerJoin', {
         username: socket.handshake.session.username,
+        userId: socket.handshake.sessionID, 
+        roomId: socket.handshake.session.roomId 
+    });
+
+    socket.on('playerJoin', function(data) {
+        console.log(`Received from client playerJoin ${data.username} ${data.roomId}`);
+    });
+
+    socket.on('answer', function(data) {
+        console.log(`Received from client answer ${data.username}  ${data.answer}`);
+        io.emit('answer', data);
     });
 
     socket.on('chat message', function(msg){
@@ -208,6 +220,15 @@ io.on('connection', function(socket){
     });
     socket.on('disconnect', function(){
         console.log('user disconnected');
+
+        if(socket.handshake.session.username !== undefined 
+           && socket.handshake.session.roomId !== undefined) {
+            io.emit('playerLeave', {
+                username: socket.handshake.session.username,
+                userId: socket.handshake.sessionID, 
+                roomId: socket.handshake.session.roomId 
+            });
+        }
     });
 });
 http.listen(process.env.PORT || 3000, function(){
