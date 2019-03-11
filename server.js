@@ -213,11 +213,12 @@ io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
-    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);
+    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);    
+    // ‘gameStateWait’ - allow players to enter the room    
     try{
         let found = getRoomObject(socket.session.handshake.roomId);
         // ADD player to the game's playerList
-        if(found != undefined){
+        if(found != undefined && found.status === 'waiting'){
             socket.join(socket.session.handshake.roomId); // add the roomId for socket communication
             console.log(found.playerList);
             found.playerList.find(function(element){
@@ -228,6 +229,9 @@ io.on('connection', function(socket){
                     console.log('added new player: ' + socket.handshake.session.username);
                 }
             })
+        }
+        else {
+            console.log('room status: ' + found.status);
         }
     }
     catch{
@@ -295,6 +299,12 @@ io.on('connection', function(socket){
             username: data.matchedUsername,
             useranswer: data.matchedUserAnswer,
         })
+         // ‘gameStateEnd’ - event to end the game, and allow players to start next round
+         // only 1 player left. aka our winner.
+         if(room.activePlayers.length === 1){
+             io.to(data.roomId).emit('gameStateEnd');
+             room.gameStatusUpdate('end');
+         }
     })
     // ‘guessMismatch’ - event for when the CURRENT TURN player guesses wrong
     //  server should notify the room which player is next
@@ -312,16 +322,21 @@ io.on('connection', function(socket){
    
     
     // ‘newRound’ - event for everyone to know the next round has started
-    // ‘gameStateWait’ - allow players to enter the room   
-    
-   
-    // ‘gameStateEnd’ - event to end the game, and allow players to start next round
-    // when all players are ready, game state changes to answer
-    // ‘gameStateAnswer’ - event to allow players to submit answers. No more players can join
-    
+    // reset all players to waiting status
+    io.on('newRound', function(data){
+        let room = getRoomObject(data.roomId);
+        room.playerList.forEach(element => {
+            room.playerStatusUpdate(element.username, 'waiting');
+        });
+        io.to(data.roomId).emit('newRound');
+
+    })
+
     // ‘playerStateReady’ - event to let the server know a player is ready.
     // when all players are ready, we can start the game
     // ‘gameStart’ - event for everyone to know the game has started
+    // when all players are ready, game state changes to answer
+    // ‘gameStateAnswer’ - event to allow players to submit answers. No more players can join
     socket.on('playerStateReady', function(msg){
         console.log(msg);
         try {
@@ -330,7 +345,8 @@ io.on('connection', function(socket){
             let roomNumber = socket.handshake.session.roomId;
             room.playerStatusUpdate(playerName, 'ready');
             if(room.playerListStatus('ready')){
-                io.to(roomNumber).emit('gameStart')
+                io.to(roomNumber).emit('gameStateAnswer');
+                room.gameStatusUpdate('playing')
             }
         }catch{
             console.log('failed on answer');
