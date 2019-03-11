@@ -1,7 +1,7 @@
 'use strict';
 
 require('@google-cloud/debug-agent').start();
-
+const gameManager = require('./newGame');
 var app = require('express')();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
@@ -16,6 +16,7 @@ var session = require('express-session')({
     });
 var bodyParser = require('body-parser');
 var ios = require('socket.io-express-session');
+
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
@@ -37,6 +38,7 @@ app.use(bodyParser.urlencoded({
     cards =[]
 }*/
 var roomList = [];
+var roomObject = [];
 
 // ON USING DATASTORE: found at https://cloud.google.com/appengine/docs/standard/nodejs/using-cloud-datastore
 // By default, the client will authenticate using the service account file
@@ -52,16 +54,29 @@ const datastore = Datastore();
 function randomInt(max){
     return Math.floor(Math.random() * max);
 }
+
 // Create game room
-function newRoom(){
+function newRoom(username){
     let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
     while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
         roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
+    //console.log(gameManager)
+    let room =new gameManager(roomId,username);
+    console.log(room)
     roomList.push(roomId);
-    console.log('fn(newRoom):: ' + roomList);
+    roomObject.push(room);
+    //console.log('fn(newRoom):: ' + roomList);
     return roomId;
 }
-
+// Get the actual room object using a roomId
+function getRoomObject(gameRoomId){
+    let found =  roomObject.find(function(element){
+        if(element.roomId === gameRoomId)
+            return true;
+        return false;
+    })
+    return found;
+}
 // this needs to be ran asynchronously
 // querying at each game request would be costly and inefficient..
 // Need to query for a whole deck and then randomly give out a card for repeated gameplay
@@ -127,12 +142,13 @@ app.post('/', function(req,res){
     req.session.username = req.body.username;
     console.log(req.body.roomId)
     if(req.body.roomId){
-        console.log('true')
+        //console.log('true')
         req.params.roomId = req.body.roomId;
     }
     else{
-        console.log('false')
-        req.params.roomId = newRoom();
+        //console.log('false')
+        req.params.roomId = newRoom(req.body.username);
+        console.log(req.params.roomId)
     }
     req.session.roomId = req.params.roomId;
     //res.status(200);
@@ -170,7 +186,7 @@ app.get('/:roomId/', async function(req,res){
             //res.status(200);
             //res.contentType('text/html');
             //res.write(card.toString());
-            res.sendFile(__dirname + '/index.html');
+            res.sendFile(__dirname + '/game.html');
             //res.end();
         }catch(error){
             console.log(error);
@@ -198,12 +214,137 @@ io.on('connection', function(socket){
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
     console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);
+    try{
+        let found = getRoomObject(socket.session.handshake.roomId);
+        // ADD player to the game's playerList
+        if(found != undefined){
+            socket.join(socket.session.handshake.roomId); // add the roomId for socket communication
+            console.log(found.playerList);
+            found.playerList.find(function(element){
+                if(element.username === socket.handshake.session.username)
+                    console.log('player: ' + socket.handshake.session.username + " already in room")
+                else{
+                    found.addPlayer(socket.handshake.session.username);
+                    console.log('added new player: ' + socket.handshake.session.username);
+                }
+            })
+        }
+    }
+    catch{
+        console.log("no room id yet");
+    }
+        //console.log('itemfound:');
+    //console.log(found);
+
+    io.emit('playerJoin', {
+        username: socket.handshake.session.username,
+        });
+    socket.on('playerLeave', function(){
+        try {
+            let playerName = socket.handshake.session.username;
+            let room = getRoomObject(socket.handshake.session.roomId)
+            let roomNumber = socket.handshake.session.roomId;
+            room.removePlayer(playerName)
+            io.to(roomNumber).emit('playerLeave', {
+              username: playerName,
+            });
+        }catch{
+            console.log('failed on playerLeave');
+        }
+    });
+    // ‘answer’ - event for when the player submits their answer
+    // when all players submit their answer, game state changes to guess
+    // ‘gameStateGuess’ - event to change the game state and start play
+    socket.on('answer', function(msg){
+        console.log(msg);
+        try {
+            let playerName = socket.handshake.session.username;
+            let room = getRoomObject(socket.handshake.session.roomId)
+            let roomNumber = socket.handshake.session.roomId;
+            room.playerAnswerUpdate(playerName, msg);
+            room.playerStatusUpdate(playerName, 'answered');
+            socket.to(roomNumber).emit('answer', {
+              username: playerName,
+              useranswer: msg,
+            });
+            if(room.playerListStatus('answered')){
+                io.to(roomNumber).emit('gameStateGuess')
+            }
+
+        }catch{
+            console.log('failed on answer');
+        }
+    })
+    // ----  EVENTS in IO  -----------------------------------------------------------------------
+    // ‘guessMatch’ - event for when the CURRENT TURN player guesses correctly
+    socket.on('guessMatch', function(data){
+        console.log('received from client guessMatch \
+            roomID ${data.roomId} \
+            ${data.username} ${data.userId} \
+            ==> ${data.matchedUsername} ${data.matchedUserAnswer}');
+        let room = getRoomObject(data.roomId);
+        room.playerOut(data.username);
+        // ‘playerOut’’ - event for when a player is out of the round, should follow a ‘guessMatch’
+        io.to(data.roomId).emit('playerOut', {
+            roomId: data.roomId,
+            username: data.matchedUsername,
+            useranswer: data.matchedUserAnswer,
+        });
+        io.to(data.roomId).emit('guessMatch', {
+            roomId: data.roomId,
+            username: data.matchedUsername,
+            useranswer: data.matchedUserAnswer,
+        })
+    })
+    // ‘guessMismatch’ - event for when the CURRENT TURN player guesses wrong
+    //  server should notify the room which player is next
+    // ‘playerTurn’ - event for everyone to know who’s turn it is to guess
+    io.on('guessMismatch', function(data){
+        let room = getRoomObject(data.roomId);
+        let listSize = room.activePlayers.length;
+        let current = room.activePlayers.indexOf(data.username);
+        let next = room.activePlayers[(current + 1) % listSize];
+        io.to(data.roomId).emit('playerTurn', {
+            roomId: data.roomId,
+            username: next,
+        });
+    });
+   
+    
+    // ‘newRound’ - event for everyone to know the next round has started
+    // ‘gameStateWait’ - allow players to enter the room   
+    
+   
+    // ‘gameStateEnd’ - event to end the game, and allow players to start next round
+    // when all players are ready, game state changes to answer
+    // ‘gameStateAnswer’ - event to allow players to submit answers. No more players can join
+    
+    // ‘playerStateReady’ - event to let the server know a player is ready.
+    // when all players are ready, we can start the game
+    // ‘gameStart’ - event for everyone to know the game has started
+    socket.on('playerStateReady', function(msg){
+        console.log(msg);
+        try {
+            let playerName = socket.handshake.session.username;
+            let room = getRoomObject(socket.handshake.session.roomId)
+            let roomNumber = socket.handshake.session.roomId;
+            room.playerStatusUpdate(playerName, 'ready');
+            if(room.playerListStatus('ready')){
+                io.to(roomNumber).emit('gameStart')
+            }
+        }catch{
+            console.log('failed on answer');
+        }
+    })
+    // ‘playerAnswered’ - event to let the server and other players know that an answer has been submitted
+    //‘playerGuessed’ - event from client to server to let the server know that player’s guess
+
     socket.on('chat message', function(msg){
         io.emit('chat message', msg);
         console.log('message: ' + msg);
     });
     socket.on('disconnect', function(){
-        console.log('user disconnected');
+        console.log(socket.handshake.session.username + ' : user disconnected');
     });
 });
 http.listen(process.env.PORT || 3000, function(){
