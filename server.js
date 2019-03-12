@@ -215,15 +215,12 @@ io.on('connection', function(socket){
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
     console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);    
     // ‘gameStateWait’ - allow players to enter the room    
-
-    // ==================================================================================================
-    // ==================================================================================================
-
-    /*try{
-        let found = getRoomObject(socket.session.handshake.roomId);
+    
+    try{
+        let found = getRoomObject(socket.handshake.session.roomId);
         // ADD player to the game's playerList
         if(found != undefined && found.status === 'waiting'){
-            socket.join(socket.session.handshake.roomId); // add the roomId for socket communication
+            socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
             console.log(found.playerList);
             found.playerList.find(function(element){
                 if(element.username === socket.handshake.session.username)
@@ -240,46 +237,15 @@ io.on('connection', function(socket){
     }
     catch{
         console.log("no room id yet");
-    }*/
+    }
         //console.log('itemfound:');
     //console.log(found);
-
-    // ==================================================================================================
-    // ==================================================================================================
 
     io.emit('playerJoin', {
         username: socket.handshake.session.username,
         userId: socket.handshake.sessionID,             // <<== changed
         roomId: socket.handshake.session.roomId         // <<== changed
         });
-
-    // ==================================================================================================
-    // <<=== changed start
-
-    socket.on('playerJoin', function(data) { 
-        let found = getRoomObject(data.roomId);
-        console.log(`Found: -------------------
-            ${found}
-            ----------------------------`);
-        if(found != undefined && found.status === 'waiting'){
-            socket.join(data.roomId); // add the roomId for socket communication
-            found.playerList.find(function(element){
-                if(element.username === data.username)
-                    console.log('player: ' + data.username + " already in room")
-                else{
-                    found.addPlayer(data.username);
-                    console.log('added new player: ' + data.username);
-                    console.log(found.playerList);
-                }
-            });
-        }
-        else {
-            console.log('room status: ' + found.status);
-        }
-    });
-
-    // <<=== changed end
-    // ==================================================================================================
 
     socket.on('playerLeave', function(){
         try {
@@ -382,7 +348,9 @@ io.on('connection', function(socket){
             let room = getRoomObject(socket.handshake.session.roomId)
             let roomNumber = socket.handshake.session.roomId;
             room.playerStatusUpdate(playerName, 'ready');
+            console.log(room);
             if(room.playerListStatus('ready')){
+                console.log('ready to answer state');
                 io.to(roomNumber).emit('gameStateAnswer');
                 room.gameStatusUpdate('playing')
             }
