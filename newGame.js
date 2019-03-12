@@ -8,10 +8,16 @@ class ThingsGame {
         this.playerList = [];
         var player = {username: name, status: 'waiting', answer: ''};
         this.playerList.push(player);
+        this.activePlayers = []
     }
     // update game status
+    // when the game starts, create get all player names as activePlayers
     gameStatusUpdate(status){
         this.status = status;
+        if(this.status === 'playing')
+            this.playerList.forEach(element =>
+                this.activePlayers.push(element.username)
+                )
     }
     // add players
     addPlayer(name){
@@ -42,6 +48,15 @@ class ThingsGame {
                 element.answer = answer;
         })
     }
+    // check that all players status is the same
+    playerListStatus(status){
+        let check = true;
+        this.playerList.forEach(element => {
+            if(element.status !== status)
+                check = false;
+        })
+        return check;
+    }
     // check player answer, return 1 for match, 0 otherwise
     checkGuess(target,answer){
         var  result = 0;
@@ -52,4 +67,17 @@ class ThingsGame {
         })
         return result | 0;
     }
+    // remove player from current round
+    playerOut(name){
+        var pos;
+        this.activePlayers.forEach(element => {
+            if(element.username === name)
+                pos = this.activePlayers.indexOf(element);
+        })
+        if(pos !== undefined)
+            this.activePlayers.splice(pos,1);
+    }
+
 }
+
+module.exports =ThingsGame;
