@@ -722,6 +722,8 @@
       //                         this player is ready 
       sockets: {
         playerJoin: function(data) {
+          console.log(data.playerList);
+
           console.log(`received from server playerJoin:  
             ${data.username}    ${data.roomId}`);
 
@@ -772,7 +774,7 @@
         },
         answer: function(data) {
           console.log(`${data.username}   ${data.useranswer}`);
-          if(data.roomId == this.roomId) {
+          //if(data.roomId == this.roomId) {
             if(data.username != this.currentPlayer.username) {
               this.submittedCards.push({
                 username: data.username,
@@ -785,7 +787,7 @@
                 username: data.username 
               });
             }
-          }
+          //}
         },
         playerOut: function(data) {
           console.log(`playerOut received from server  ${data}`);
