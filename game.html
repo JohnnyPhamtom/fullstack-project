@@ -772,7 +772,7 @@
         },
         answer: function(data) {
           console.log(`${data.username}   ${data.useranswer}`);
-          if(data.roomId == this.roomId) {
+          //if(data.roomId == this.roomId) {
             if(data.username != this.currentPlayer.username) {
               this.submittedCards.push({
                 username: data.username,
@@ -785,7 +785,7 @@
                 username: data.username 
               });
             }
-          }
+          //}
         },
         playerOut: function(data) {
           console.log(`playerOut received from server  ${data}`);
