@@ -55,13 +55,28 @@ function randomInt(max){
     return Math.floor(Math.random() * max);
 }
 
+// Clean up inactive rooms every 30 minutes.
+function cleanRooms(){
+    var len = roomList.length;
+    for(var i = 0; i < len; i++){
+        if(roomObject[i].playerList === []){
+            roomObject.splice(i,1);
+            roomList.splice(i,1);
+        }
+    }
+}
+setInterval(cleanRooms, (30*60*1000)); // 30mins * 60secs * 1000ms
 // Create game room
-function newRoom(username){
+async function newRoom(username){
     let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
     while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
         roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
     //console.log(gameManager)
     let room =new gameManager(roomId,username);
+    const result = await getCard();
+    const entities = result[0];
+    const card = entities.map( entity => `Text: ${entity.Text}`);
+    room.cards = card;
     console.log(room)
     roomList.push(roomId);
     roomObject.push(room);
@@ -80,11 +95,14 @@ function getRoomObject(gameRoomId){
 // this needs to be ran asynchronously
 // querying at each game request would be costly and inefficient..
 // Need to query for a whole deck and then randomly give out a card for repeated gameplay
-function getCard() {
-    let randNum = randomInt(3);
+async function getCard() {
+    const min = 0;
+    const max = 3;
     const query = datastore
     .createQuery('Card')
-    .filter('Index', '=', randNum)
+    .filter('Index', '>=', min)
+    .filter('Index', '<', max)
+    //.filter('Index', '=', randNum)
     .order('Index', {descending: true})
     .limit(10);
     return datastore.runQuery(query);
@@ -136,26 +154,28 @@ app.get('/', async function(req,res){
 // Upon the submit POST button from the home page, we need to determine if
 // the user wants to join or create a room.
 // Then redirect the user to the appropriate room.
-app.post('/', function(req,res){
-    console.log("onPOST:: " + req.body.username)
-    console.log(req.session.username)
-    req.session.username = req.body.username;
-    console.log(req.body.roomId)
-    if(req.body.roomId){
-        //console.log('true')
-        req.params.roomId = req.body.roomId;
+app.post('/', async function(req,res){
+        console.log("onPOST:: " + req.body.username)
+        console.log(req.session.username)
+        req.session.username = req.body.username;
+        console.log(req.body.roomId)
+        try { 
+        if(req.body.roomId){
+            //console.log('true')
+            req.params.roomId = req.body.roomId;
+        }
+        else{
+            //when creating a new room, we need to query data and load up the cards
+            req.params.roomId = await newRoom(req.body.username);
+            console.log(req.params.roomId)
+        }
+        req.session.roomId = req.params.roomId;
+        
+        res.redirect('/'+ req.params.roomId);
     }
-    else{
-        //console.log('false')
-        req.params.roomId = newRoom(req.body.username);
-        console.log(req.params.roomId)
+    catch(error){
+        console.log(error);
     }
-    req.session.roomId = req.params.roomId;
-    //res.status(200);
-    //res.contentType('text/html');
-    //res.write('room number generated: '+ JSON.stringify(req.body, null, 2));
-    //res.end();
-    res.redirect('/'+ req.params.roomId);
 })
 // creates a game page.
 /*
@@ -173,7 +193,7 @@ app.get('/game/', function(req,res){
 });
 */
 // testing for random room generation
-app.get('/:roomId/', async function(req,res){
+app.get('/:roomId/', function(req,res){
     //console.log(req.params.room);
     //console.log(roomList);
     console.log(req.sessionID)
@@ -230,11 +250,12 @@ io.on('connection', function(socket){
                     console.log('added new player: ' + socket.handshake.session.username);
                 }
             })
+            let playerNames = found.getPlayerNames()
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
                 roomId: socket.handshake.session.roomId,         // <<== changed
-                playerList: found.playerList.length == 0 ? [] : found.playerList 
+                playerList: playerNames.length == 0 ? [] : playerNames 
             });
         }
         else {
@@ -285,7 +306,11 @@ io.on('connection', function(socket){
               useranswer: msg,
             });
             if(room.playerListStatus('answered')){
-                io.to(roomNumber).emit('gameStateGuess')
+                let startingPlayer = room.activePlayers[randomInt(room.activePlayers.length)];
+                console.log('starting player is : ' + startingPlayer);
+                io.to(roomNumber).emit('gameStateGuess', {
+                    username: startingPlayer
+                })
             }
 
         }catch{
@@ -360,7 +385,9 @@ io.on('connection', function(socket){
             console.log(room);
             if(room.playerListStatus('ready')){
                 console.log('ready to answer state');
-                io.to(roomNumber).emit('gameStateAnswer');
+                io.to(roomNumber).emit('gameStateAnswer', {
+                    question: room.cards[randomInt(room.cards.length)]
+                });
                 room.gameStatusUpdate('playing')
             }
         }catch{

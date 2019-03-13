@@ -8,7 +8,8 @@ class ThingsGame {
         this.playerList = [];
         var player = {username: name, status: 'waiting', answer: ''};
         this.playerList.push(player);
-        this.activePlayers = []
+        this.activePlayers = [];
+        this.cards = [];
     }
     // update game status
     // when the game starts, create get all player names as activePlayers
@@ -33,6 +34,13 @@ class ThingsGame {
         })
         if(pos !== undefined)
             this.playerList.splice(pos,1);
+    }
+    // get all player names
+    getPlayerNames(){
+        var playerNames = [];
+        this.playerList.forEach(element =>
+            playerNames.push(element.username));
+        return playerNames;
     }
     // update player status
     playerStatusUpdate(name,status){
