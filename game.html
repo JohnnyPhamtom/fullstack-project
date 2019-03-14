@@ -775,14 +775,15 @@
         // current player
         currentPlayer: {
           // assume that the players are identified by their names
-          username: 'player1', 
+          username: '', 
           userId: undefined
         },
+        firstTime: true,
         currentPlayerAnswered: false,
         // the players' info in current room
         playersInRoom: [
           // an array of player objects
-          {
+          /*{
             username: 'player1',
             ready: false
           },
@@ -793,11 +794,11 @@
           {
             username: 'player3',
             ready: false
-          },
+          },*/
         ],
         // the user infos for having submitted answer
         submittedCards: [
-          {
+          /*{
             username: 'player1',
             useranswer: 'answer1'
           },
@@ -808,19 +809,19 @@
           {
             username: 'player3',
             useranswer: 'answer3'
-          },
+          },*/
         ],
         // separated two lists for shuffling in guessing stage
         submittedUsers: [
-          {username: 'player1'},
+          /*{username: 'player1'},
           {username: 'player2'},
-          {username: 'player3'},
+          {username: 'player3'},*/
         ],
         // the answers of the users
         submittedAnswers: [
-          {useranswer: 'answer1'},
+          /*{useranswer: 'answer1'},
           {useranswer: 'answer2'},
-          {useranswer: 'answer3'},
+          {useranswer: 'answer3'},*/
         ],
         // current mode of the game, default (initial) is "wait"
         currentGameMode: 'wait',
@@ -855,14 +856,9 @@
           });
 
           this.currentPlayerAnswered = true;
+
+          this.currentGameMode = 'observe answer';
           
-          /*
-          this.$socket.emit('answer', {
-            userId: this.currentPlayer.userId,
-            username: answer.username,
-            answer: answer.userinput
-          });
-          */
           this.$socket.emit('answer', answer.userinput);
         },
         // submitGuessedMatch shall be triggered when current player confirm its match
@@ -1033,6 +1029,17 @@
         playerJoin: function(data) {
           console.log(data.playerList);
 
+          if(this.firstTime) {
+            data.playerList.forEach(function(player) {
+              app.playersInRoom.push({
+                username: player,
+                ready: false
+              });
+            });
+            this.firstTime = false;
+          }
+          
+
           console.log(`received from server playerJoin:  
             ${data.username}    ${data.roomId}`);
 
@@ -1056,7 +1063,7 @@
 
           let inGame = false;
           for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
-            if(this.playersInRoom[ii].userId == data.userId)
+            if(this.playersInRoom[ii].username == data.username)
               inGame = true;
           }
 
@@ -1147,7 +1154,7 @@
             // change the game components related to 'guess'
             this.currentGameMode = 'guess';
           } else {
-            this.currentGameMode = 'observe';
+            this.currentGameMode = 'observe guess';
           }
         },
         newRound: function(data) {
@@ -1167,9 +1174,13 @@
           // do something that let current player know game state changed
           this.currentGameMode = 'answer';
         },
-        gameStateGuess: function() {
-          console.log(`Received from server gameStateGuess`);
-          // do something that let current player know game state changed
+        gameStateGuess: function(data) {
+          console.log(`Received from server gameStateGuess ${data.username}`);
+          if(data.username == this.currentPlayer.username) {
+            this.currentGameMode = 'guess';
+          } else {
+            this.currentGameMode = 'observe guess';
+          }
         },
         gameStateEnd: function() {
           console.log(`Received from server gameStateEnd`);
