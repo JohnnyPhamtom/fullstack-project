@@ -67,12 +67,12 @@ function cleanRooms(){
 }
 setInterval(cleanRooms, (30*60*1000)); // 30mins * 60secs * 1000ms
 // Create game room
-async function newRoom(username){
+async function newRoom(username, avatarUrl){
     let roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
     while(roomList.includes(roomId)) // regenerate rooms until a unique ID is made
         roomId = Math.random().toString(36).replace('0.', '').substr(0,6);
     //console.log(gameManager)
-    let room =new gameManager(roomId,username);
+    let room =new gameManager(roomId,username, avatarUrl);
     const result = await getCard();
     const entities = result[0];
     const card = entities.map( entity => `Text: ${entity.Text}`);
@@ -170,7 +170,7 @@ app.post('/', async function(req,res){
             console.log(req.params.roomId)
         }
         req.session.roomId = req.params.roomId;
-        
+        req.session.avatarUrl = req.body.avatarUrl;
         res.redirect('/'+ req.params.roomId);
     }
     catch(error){
@@ -246,16 +246,17 @@ io.on('connection', function(socket){
                 if(element.username === socket.handshake.session.username)
                     console.log('player: ' + socket.handshake.session.username + " already in room")
                 else{
-                    found.addPlayer(socket.handshake.session.username);
+                    found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
                     console.log('added new player: ' + socket.handshake.session.username);
                 }
             })
-            let playerNames = found.getPlayerNames()
+            //let playerNames = found.getPlayerNames()
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
                 roomId: socket.handshake.session.roomId,         // <<== changed
-                playerList: playerNames.length == 0 ? [] : playerNames 
+                //playerList: playerNames.length == 0 ? [] : playerNames
+                playerList: found.playerList, 
             });
         }
         else {
@@ -277,19 +278,19 @@ io.on('connection', function(socket){
         });
         */
 
-    socket.on('playerLeave', function(){
-        try {
-            let playerName = socket.handshake.session.username;
-            let room = getRoomObject(socket.handshake.session.roomId)
-            let roomNumber = socket.handshake.session.roomId;
-            room.removePlayer(playerName)
-            io.to(roomNumber).emit('playerLeave', {
-              username: playerName,
-            });
-        }catch{
-            console.log('failed on playerLeave');
-        }
-    });
+    // socket.on('playerLeave', function(){
+    //     try {
+    //         let playerName = socket.handshake.session.username;
+    //         let room = getRoomObject(socket.handshake.session.roomId)
+    //         let roomNumber = socket.handshake.session.roomId;
+    //         room.removePlayer(playerName)
+    //         io.to(roomNumber).emit('playerLeave', {
+    //           username: playerName,
+    //         });
+    //     }catch{
+    //         console.log('failed on playerLeave');
+    //     }
+    // });
     // ‘answer’ - event for when the player submits their answer
     // when all players submit their answer, game state changes to guess
     // ‘gameStateGuess’ - event to change the game state and start play
@@ -326,6 +327,8 @@ io.on('connection', function(socket){
             ==> ${data.matchedUsername} ${data.matchedUserAnswer}');
         let room = getRoomObject(data.roomId);
         room.playerOut(data.username);
+        console.log('playerOut fn: ' + data.username);
+        console.log(room);
         // ‘playerOut’’ - event for when a player is out of the round, should follow a ‘guessMatch’
         io.to(data.roomId).emit('playerOut', {
             roomId: data.roomId,
@@ -347,7 +350,7 @@ io.on('connection', function(socket){
     // ‘guessMismatch’ - event for when the CURRENT TURN player guesses wrong
     //  server should notify the room which player is next
     // ‘playerTurn’ - event for everyone to know who’s turn it is to guess
-    io.on('guessMismatch', function(data){
+    socket.on('guessMismatch', function(data){
         let room = getRoomObject(data.roomId);
         let listSize = room.activePlayers.length;
         let current = room.activePlayers.indexOf(data.username);
@@ -382,7 +385,12 @@ io.on('connection', function(socket){
             let room = getRoomObject(socket.handshake.session.roomId)
             let roomNumber = socket.handshake.session.roomId;
             room.playerStatusUpdate(playerName, 'ready');
-            console.log(room);
+            //console.log(room);
+            io.to(roomNumber).emit('playerReady', {
+                username: playerName,
+                roomId: roomNumber,
+                ready: true,
+            })
             if(room.playerListStatus('ready')){
                 console.log('ready to answer state');
                 io.to(roomNumber).emit('gameStateAnswer', {
@@ -401,8 +409,23 @@ io.on('connection', function(socket){
         io.emit('chat message', msg);
         console.log('message: ' + msg);
     });
+
+    // moved playerLeave to socket disconnect
     socket.on('disconnect', function(){
         console.log(socket.handshake.session.username + ' : user disconnected');
+        try {
+            let playerName = socket.handshake.session.username;
+            let room = getRoomObject(socket.handshake.session.roomId)
+            let roomNumber = socket.handshake.session.roomId;
+            if(room !== undefined){
+                room.removePlayer(playerName)
+                io.to(roomNumber).emit('playerLeave', {
+                    username: playerName,
+                });
+            }
+        }catch{
+            console.log('failed on playerLeave');
+        }
     });
 });
 http.listen(process.env.PORT || 3000, function(){

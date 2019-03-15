@@ -1,12 +1,12 @@
 // Manage the game state inside a single object
 
 class ThingsGame {
-    constructor(roomId, name){
+    constructor(roomId, name, url){
         this.roomId = roomId;
         this.status = 'waiting';
         this.owner = name;
         this.playerList = [];
-        var player = {username: name, status: 'waiting', answer: ''};
+        var player = {username: name, status: 'waiting', answer: '', avatar: url, ready: false};
         this.playerList.push(player);
         this.activePlayers = [];
         this.cards = [];
@@ -21,8 +21,8 @@ class ThingsGame {
                 )
     }
     // add players
-    addPlayer(name){
-        var player = {username: name, status: 'waiting', answer: ''};
+    addPlayer(name, url){
+        var player = {username: name, status: 'waiting', answer: '', avatar: url, ready: false};
         this.playerList.push(player);
     }
     // remove players
@@ -79,11 +79,14 @@ class ThingsGame {
     playerOut(name){
         var pos;
         this.activePlayers.forEach(element => {
-            if(element.username === name)
+            if(element === name)
                 pos = this.activePlayers.indexOf(element);
+            
         })
+        console.log('in playerOutfn:' + pos);
         if(pos !== undefined)
             this.activePlayers.splice(pos,1);
+
     }
 
 }
