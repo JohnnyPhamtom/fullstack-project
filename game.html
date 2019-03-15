@@ -48,11 +48,11 @@
       }
 
       #status-panel {
-        border: solid;
+        /* border: solid; */
         position: absolute;
-        left: 1px;
+        left: 0px;
         width: 29%;
-        height: 99%;
+        height: 100%;
       }
 
       #control-panel {
@@ -62,7 +62,7 @@
         border-right: solid;
         bottom: 0px;
         width: 100%;
-        height: 24.5%;
+        height: 25%;
         /*background-image: url('https://storage.googleapis.com/studydsstore/1552258880202bg_alternative1.jpg');
         background-size: cover; */
       }
@@ -73,9 +73,12 @@
 
       #players-in-room {
         position: absolute;
+        border-bottom: solid;
+        border-right: solid;
         width: 100%;
-        top: 30%;
-        left: 1px;
+        height: 35%;
+        top: 0px;
+        left: 0px;
       }
 
       #players-list {
@@ -85,6 +88,131 @@
 
       #players-list div {
         margin-bottom: 2px;
+      }
+
+      #current-player-info-container {
+        position: absolute;
+        top: 36%;
+        left: 0px;
+        width: 100%;
+        height: 20%;
+        border-bottom: solid;
+        border-top: solid;
+        border-right: solid;
+      }
+
+      #current-player-info-avatar-container {
+        position: absolute;
+        left: 5px;
+        height: 95%;
+        top: 2%;
+        width: 50%;
+        border: 1px solid black;
+        border-radius: 10px;
+      }
+
+      #current-player-info-avatar-img {
+        height: 100%;
+        width: 100%;
+        object-fit: contain;
+      }
+
+      #current-player-info-text-container {
+        position: absolute;
+        right: 0px;
+        top: 0px;
+        width: 46%;
+        height: 98%;
+      }
+
+      #current-player-info-text-username {
+        position: absolute;
+        width: 100%;
+        height: 32%;
+        top: 0px;
+        left: 0px;
+        font-size: 20px;
+        font-family: 'Handlee';
+        font-weight: bold;
+        padding-left: 1%;
+        padding-top: 5%;
+      }
+
+      #current-player-info-text-points {
+        position: absolute;
+        width: 100%;
+        height: 32%;
+        top: 33%;
+        left: 0px;
+        font-size: 20px;
+        font-family: 'Handlee';
+        font-weight: bold;
+        padding-left: 1%;
+        padding-top: 5%;
+      }
+
+      #current-player-info-text-ready-button {
+        position: absolute;
+        width: 100%;
+        height: 32%;
+        top: 66%;
+        left: 0px;
+      }
+
+      #current-player-ready-button {
+        width: 80%;
+        height: 80%;
+        position: absolute;
+        left: 5%;
+        top: 10%;
+        border: 2px solid black;
+        border-radius: 10px;
+      }
+
+      #current-player-ready-button span {
+        display: block;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 20px;
+        font-family: 'Handlee';
+        font-weight: bold;
+      }
+
+      #current-player-ready-button:hover {
+        border: 3px solid black;
+        border-radius: 10px; 
+      }
+
+      #current-card-info-container {
+        position: absolute;
+        top: 57.5%;
+        height: 13.5%;
+        left: 0px;
+        width: 96%;
+        border-bottom: solid;
+        border-top: solid;
+        border-right: solid;
+        font-size: 20px;
+        font-family: 'Handlee';
+        padding-top: 3%;
+        padding-left: 4%;
+      }
+
+      #current-card-info-container span {
+        font-size: 25px;
+        font-family: 'Handlee';  
+      }
+
+      #message-log-container {
+        position: absolute;
+        top: 74.5%;
+        left: 0px;
+        width: 100%;
+        height: 25%;
+        border-top: solid;
+        border-right: solid; 
       }
 
       #cards {
@@ -111,7 +239,7 @@
         top: 0px;
         left: 0px;
         width: 100%;
-        height: 74%;
+        height: 73.5%;
         margin: 0%;
         overflow: hidden;
         border-bottom: solid;
@@ -376,6 +504,33 @@
       <div id="status-panel">
         <players-in-room
           v-bind:players="playersInRoom"></players-in-room>
+        <div id="current-player-info-container">
+          <div id="current-player-info-avatar-container">
+            <img id="current-player-info-avatar-img" src="https://storage.googleapis.com/studydsstore/1552259339227avatar3.jpg">
+          </div>
+          <div id="current-player-info-text-container">
+            <div id="current-player-info-text-username">
+              Name: {{ currentPlayer.username }}
+            </div>
+            <div id="current-player-info-text-points">
+              Points: {{ currentPlayer.points }}
+            </div>
+            <div id="current-player-info-text-ready-button">
+              <p>
+                <div
+                  id="current-player-ready-button"
+                  v-on:click="currentPlayerReady"><span>Ready</span></div> 
+              </p>
+            </div>
+          </div>
+        </div>
+        <div id="current-card-info-container">
+          Current card question:<br>
+          <span style="text-align:center">{{ currentCard }}</span>
+        </div>
+        <div id="message-log-container">
+
+        </div>
       </div>
 
       <div id="main-panel">
@@ -404,14 +559,6 @@
             v-on:click="gameModeTransition(mode)">{{ mode }}</button>  
           </div>
       </div>
-
-      <input 
-        id="username" 
-        v-model="currentPlayer.username" 
-        style="position:relative;">
-      <button
-        v-on:click="currentPlayerReady"
-        style="position:relative">Ready</button>
     </div>
   </body>
   <script type="text/javascript">
@@ -759,6 +906,36 @@
       '
     });
 
+    Vue.component('observe-wait-form', {
+      props: ['msg'],
+      template: '\
+        <div id="observe-form">\
+          <div id="observe-form-container">\
+            <span>{{ msg[0] }}</span>\
+            <span style="text-decoration: underline">\
+              {{ msg[1] }}\
+            </span>\
+            <span>{{ msg[2] }}</span>\
+          </div>\
+        </div>\
+      '
+    });
+
+    Vue.component('observe-answer-form', {
+      props: ['msg'],
+      template: '\
+        <div id="observe-form">\
+          <div id="observe-form-container">\
+            <span>{{ msg[0] }}</span>\
+            <span style="text-decoration: underline">\
+              {{ msg[1] }}\
+            </span>\
+            <span>{{ msg[2] }}</span>\
+          </div>\
+        </div>\
+      '
+    });
+
 
 
     // The event bus handling the global page's events 
@@ -775,30 +952,36 @@
         // current player
         currentPlayer: {
           // assume that the players are identified by their names
-          username: '', 
-          userId: undefined
+          username: 'player1', 
+          avatarUrl: '',
+          userId: undefined,
+          points: 0,
         },
         firstTime: true,
         currentPlayerAnswered: false,
+        currentCard: 'The things... you hope in 2019',
         // the players' info in current room
         playersInRoom: [
           // an array of player objects
-          /*{
+          {
             username: 'player1',
+            avatarUrl: '',
             ready: false
           },
           {
             username: 'player2',
+            avatarUrl: '',
             ready: false
           },
           {
             username: 'player3',
+            avatarUrl: '',
             ready: false
-          },*/
+          },
         ],
         // the user infos for having submitted answer
         submittedCards: [
-          /*{
+          {
             username: 'player1',
             useranswer: 'answer1'
           },
@@ -809,19 +992,19 @@
           {
             username: 'player3',
             useranswer: 'answer3'
-          },*/
+          },
         ],
         // separated two lists for shuffling in guessing stage
         submittedUsers: [
-          /*{username: 'player1'},
+          {username: 'player1'},
           {username: 'player2'},
-          {username: 'player3'},*/
+          {username: 'player3'},
         ],
         // the answers of the users
         submittedAnswers: [
-          /*{useranswer: 'answer1'},
+          {useranswer: 'answer1'},
           {useranswer: 'answer2'},
-          {useranswer: 'answer3'},*/
+          {useranswer: 'answer3'},
         ],
         // current mode of the game, default (initial) is "wait"
         currentGameMode: 'wait',
@@ -969,9 +1152,9 @@
             case 'out of round':
               return 'out-of-round-form';
             case 'wait':
-              return 'observe-form';
+              return 'observe-wait-form';
             case 'observe answer': 
-              return 'observe-form';
+              return 'observe-answer-form';
             case 'observe guess':
               return 'observe-form';
             default: 
@@ -998,14 +1181,51 @@
         },
         observeMsg: function() {
           switch(this.currentGameMode) {
-            case 'observe answer':
-              return 'Please wait for other players finish answering the card';
-            case 'observe guess':
+            case 'observe answer': {
+              let strUnsubmittedPlayers = [];
+
+              this.playersInRoom.forEach(function(player) {
+                let submitted = false;
+                for(let ii = 0; ii < app.submittedUsers.length; ++ii) {
+                  if(player.username == app.submittedUsers[ii].username) {
+                    submitted = true;
+                    break;
+                  }
+                }
+                if(!submitted) {
+                  strUnsubmittedPlayers.push(player.username);
+                }
+              });
+              strUnsubmittedPlayers = 
+                strUnsubmittedPlayers.length === 0 
+                  ? ''
+                  : strUnsubmittedPlayers.join(' ,');
+
+              return strUnsubmittedPlayers.length === 0 
+                ? ['Please wait server\'s response ...', '', ''] 
+                : ['Please wait for', 
+                    strUnsubmittedPlayers, 
+                    'finish answering the card'
+                  ];
+            }
+          
+            case 'observe guess': 
               return 'Currently it\'s not your turn to guess a match';
-            case 'wait':
-              return 'Game will start after all the players click "ready"';
+
+            case 'wait': {
+              let strUnreadyPlayers = [];
+
+              this.playersInRoom.forEach(function(player) {
+                if(player.ready === false) {
+                  strUnreadyPlayers.push(player.username);
+                }
+              });
+              strUnreadyPlayers = strUnreadyPlayers.join(' ,'); 
+
+              return ['Game will start after', strUnreadyPlayers, 'click "ready"'];
+            }
           }
-        }
+        },
       },
       // handle all the events sent from server side
       // Currently handle following events:
