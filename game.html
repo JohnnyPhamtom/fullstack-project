@@ -725,10 +725,19 @@
             </p>\
           </div>\
           <div\
-            v-on:click="$emit(\'submit-guessed-match\')"\
+            v-on:click="submitGuessedMatchHandler"\
             id="guess-form-button">&nbsp Match</div>\
         </div>\
       ',
+      methods: {
+        submitGuessedMatchHandler: function() {
+          if(this.guess.username == this.$root.currentPlayer.username) {
+            // do something
+          } else {
+            this.$emit('submit-guessed-match');
+          }
+        }
+      }
     });
 
     /*
@@ -1421,7 +1430,7 @@
           // do something that let current player know game state changed
         },
         gameStateAnswer: function(data) {
-          console.log(`Received from server gameStateAnswer`);
+          console.log(`Received from server gameStateAnswer ${data.question}`);
           // do something that let current player know game state changed
           this.currentGameMode = 'answer';
           this.currentCard = data.question;
@@ -1436,7 +1445,21 @@
         },
         gameStateEnd: function() {
           console.log(`Received from server gameStateEnd`);
-          // do something that let current player know game state changed
+          this.$socket.emit('newRound', {
+            roomId: this.roomId
+          });
+
+          this.playersInRoom.forEach(function(player) {
+            player.ready = false;
+          });
+          this.submittedAnswers = [];
+          this.submittedUsers = [];
+          this.submittedCards = [];
+          this.guessedResult = {
+            username: '',
+            useranswer: ''
+          };
+
           this.currentGameMode = 'wait';
         },
         playerStateReady: function(data) {
