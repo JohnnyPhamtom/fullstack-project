@@ -347,6 +347,7 @@ io.on('connection', function(socket){
          if(room.activePlayers.length === 1){
              io.to(data.roomId).emit('gameStateEnd');
              room.gameStatusUpdate('end');
+             room.activePlayers = [];
          }
     })
     // ‘guessMismatch’ - event for when the CURRENT TURN player guesses wrong
@@ -372,8 +373,7 @@ io.on('connection', function(socket){
             room.playerStatusUpdate(element.username, 'waiting');
         });
         io.to(data.roomId).emit('newRound');
-
-    })
+    });
 
     // ‘playerStateReady’ - event to let the server know a player is ready.
     // when all players are ready, we can start the game
