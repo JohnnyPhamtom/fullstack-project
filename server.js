@@ -166,11 +166,12 @@ app.post('/', async function(req,res){
         }
         else{
             //when creating a new room, we need to query data and load up the cards
-            req.params.roomId = await newRoom(req.body.username);
+            req.params.roomId = await newRoom(req.body.username, req.body.avatarUrl);
             console.log(req.params.roomId)
         }
         req.session.roomId = req.params.roomId;
         req.session.avatarUrl = req.body.avatarUrl;
+        console.log(`Avatar:  ${req.session.avatarUrl}`);
         res.redirect('/'+ req.params.roomId);
     }
     catch(error){
@@ -233,7 +234,7 @@ io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
-    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);    
+    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);   
     // ‘gameStateWait’ - allow players to enter the room    
     
     try{
@@ -254,8 +255,9 @@ io.on('connection', function(socket){
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
-                roomId: socket.handshake.session.roomId,         // <<== changed
+                roomId: socket.handshake.session.roomId,        // <<== changed
                 //playerList: playerNames.length == 0 ? [] : playerNames
+                avatarUrl: socket.handshake.session.avatarUrl,  // <<== changed
                 playerList: found.playerList, 
             });
         }

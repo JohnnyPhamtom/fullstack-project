@@ -506,7 +506,7 @@
           v-bind:players="playersInRoom"></players-in-room>
         <div id="current-player-info-container">
           <div id="current-player-info-avatar-container">
-            <img id="current-player-info-avatar-img" src="https://storage.googleapis.com/studydsstore/1552259339227avatar3.jpg">
+            <img id="current-player-info-avatar-img" v-bind:src="currentPlayer.avatarUrl">
           </div>
           <div id="current-player-info-text-container">
             <div id="current-player-info-text-username">
@@ -571,7 +571,7 @@
       props: ['avatar'],
       template: '\
         <div>\
-          <img class="avatar-image" src="https://storage.googleapis.com/studydsstore/1552259339227avatar3.jpg">\
+          <img class="avatar-image" v-bind:src="avatar.avatarUrl">\
           <div class="username-container">\
             {{ avatar.username }}\
           </div>\
@@ -643,7 +643,7 @@
           v-on:mouseenter="activeAnimation"\
           v-on:mouseleave="disableAnimation"\
           v-bind:class="{animated: isActive, bounce: isActive, \'guess-pointer\': isActive}"\>\
-          <img class="avatar-image" src="https://storage.googleapis.com/studydsstore/1552259339227avatar3.jpg">\
+          <img class="avatar-image" v-bind:src="avatar.avatarUrl">\
           <div class="username-container">\
             {{ avatar.username }}\
           </div>\
@@ -846,6 +846,7 @@
         return {
           user: {
             username: this.currentPlayer.username,
+            avatarUrl: this.currentPlayer.avatarUrl,
             userinput: ''
           }
         };
@@ -959,11 +960,11 @@
         },
         firstTime: true,
         currentPlayerAnswered: false,
-        currentCard: 'The things... you hope in 2019',
+        currentCard: '',
         // the players' info in current room
         playersInRoom: [
           // an array of player objects
-          {
+          /*{
             username: 'player1',
             avatarUrl: '',
             ready: false
@@ -977,11 +978,11 @@
             username: 'player3',
             avatarUrl: '',
             ready: false
-          },
+          },*/
         ],
         // the user infos for having submitted answer
         submittedCards: [
-          {
+          /*{
             username: 'player1',
             useranswer: 'answer1'
           },
@@ -992,19 +993,19 @@
           {
             username: 'player3',
             useranswer: 'answer3'
-          },
+          },*/
         ],
         // separated two lists for shuffling in guessing stage
         submittedUsers: [
-          {username: 'player1'},
+          /*{username: 'player1'},
           {username: 'player2'},
-          {username: 'player3'},
+          {username: 'player3'},*/
         ],
         // the answers of the users
         submittedAnswers: [
-          {useranswer: 'answer1'},
+          /*{useranswer: 'answer1'},
           {useranswer: 'answer2'},
-          {useranswer: 'answer3'},
+          {useranswer: 'answer3'},*/
         ],
         // current mode of the game, default (initial) is "wait"
         currentGameMode: 'wait',
@@ -1031,11 +1032,15 @@
         submitAnswer: function(answer) {
           console.log(answer.username + '......' + answer.userinput);
 
-          this.submittedUsers.push({username: answer.username});
+          this.submittedUsers.push({
+            username: answer.username,
+            avatarUrl: answer.avatarUrl
+          });
           this.submittedAnswers.push({useranswer: answer.userinput});
           this.submittedCards.push({
             username: answer.username,
-            useranswer: answer.userinput
+            useranswer: answer.userinput,
+            avatarUrl: answer.avatarUrl
           });
 
           this.currentPlayerAnswered = true;
@@ -1248,17 +1253,21 @@
       sockets: {
         playerJoin: function(data) {
           console.log(data.playerList);
-
+          
+          // let currentPlayerAvatarUrl = '';
           if(this.firstTime) {
             data.playerList.forEach(function(player) {
               app.playersInRoom.push({
-                username: player,
-                ready: false
+                username: player.username,
+                ready: player.ready,
+                avatarUrl: player.avatar
               });
+              // if(player.username == data.username) {
+              //  currentPlayerAvatarUrl = player.avatar;
+              //}
             });
             this.firstTime = false;
           }
-          
 
           console.log(`received from server playerJoin:  
             ${data.username}    ${data.roomId}`);
@@ -1272,6 +1281,8 @@
             if(data.username !== undefined && data.roomId !== undefined) {
               this.currentPlayer.username = data.username;
               this.currentPlayer.userId = data.userId;
+              //this.currentPlayer.avatarUrl = currentPlayerAvatarUrl;
+              this.currentPlayer.avatarUrl = data.avatarUrl;
 
               this.$socket.emit('playerJoin', {
                 username: data.username,
@@ -1280,6 +1291,8 @@
               });
             }
           } 
+
+          console.log(this.playersInRoom);
 
           let inGame = false;
           for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
@@ -1290,7 +1303,8 @@
           if(!inGame && data.username !== undefined && data.roomId !== undefined) {
             app.playersInRoom.push({
               username: data.username,
-              ready: false
+              avatarUrl: data.avatarUrl,
+              ready: data.ready
             });
           }
         },
@@ -1308,20 +1322,37 @@
             }
           });
         },
+        playerReady: function(data) {
+          this.playersInRoom.forEach(function(player) {
+            if(player.username == data.username) {
+              player.ready = true;
+            }
+          });
+        },
         answer: function(data) {
           console.log(`${data.username}   ${data.useranswer}`);
           //if(data.roomId == this.roomId) {
             if(data.username != this.currentPlayer.username) {
-              this.submittedCards.push({
-                username: data.username,
-                useranswer: data.useranswer  
-              });
               this.submittedAnswers.push({
                 useranswer: data.useranswer
               });
-              this.submittedUsers.push({
-                username: data.username 
+
+              let submittedUserAvatar = '';
+              this.playersInRoom.forEach(function(player) {
+                if(player.username == data.username) {
+                  submittedUserAvatar = player.avatarUrl;
+                }
               });
+              this.submittedUsers.push({
+                username: data.username, 
+                avatarUrl: submittedUserAvatar
+              });
+
+              this.submittedCards.push({
+                username: data.username,
+                useranswer: data.useranswer,
+                avatarUrl: submittedUserAvatar  
+              });              
             }
           //}
         },
@@ -1389,10 +1420,11 @@
           console.log(`Received from server gameStateWait`);
           // do something that let current player know game state changed
         },
-        gameStateAnswer: function() {
+        gameStateAnswer: function(data) {
           console.log(`Received from server gameStateAnswer`);
           // do something that let current player know game state changed
           this.currentGameMode = 'answer';
+          this.currentCard = data.question;
         },
         gameStateGuess: function(data) {
           console.log(`Received from server gameStateGuess ${data.username}`);
@@ -1405,6 +1437,7 @@
         gameStateEnd: function() {
           console.log(`Received from server gameStateEnd`);
           // do something that let current player know game state changed
+          this.currentGameMode = 'wait';
         },
         playerStateReady: function(data) {
           console.log(`Received from server playerStateReady ${data.username}`);
