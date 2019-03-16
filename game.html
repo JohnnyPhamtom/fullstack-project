@@ -16,6 +16,7 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.slim.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/vue-socket.io-extended"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.0/moment.min.js"></script>
 
     <title>The game of things</title>
 
@@ -213,6 +214,7 @@
         height: 25%;
         border-top: solid;
         border-right: solid; 
+        overflow-y: scroll;
       }
 
       #cards {
@@ -300,7 +302,7 @@
 
       .avatar-image {
         width: 80%;
-        height: 80%;
+        height: 70%;
         margin-left: 20%;
         object-fit: contain;
         margin-bottom: 0px;
@@ -390,6 +392,17 @@
       #answer-input-enter-button:hover {
         cursor: pointer;
         border: 3px solid black;
+      }
+
+      #guess-form-prompt-container {
+        left: 5%;
+        top: 1px;
+        width: 70%;
+        height: 18%;
+        position: absolute;
+        font-size: 20px;
+        font-family: 'Kalam';
+        text-align: center;
       }
 
       #guess-form-container {
@@ -497,6 +510,25 @@
       .guess-pointer {
         cursor: pointer;
       }
+
+      #message-log-container ul#messages {
+        padding-left: 5px;
+      }
+
+      #message-log-container ul#messages > p{
+        margin-left: 3px;
+      }
+
+      .message-time {
+        font-size: 15px;
+        font-family: 'Handlee';
+        font-weight: bold;
+      }
+
+      .message-content {
+        font-size: 20px;
+        font-family: 'Handlee';
+      }
     </style>
   </head>
   <body>
@@ -529,7 +561,13 @@
           <span style="text-align:center">{{ currentCard }}</span>
         </div>
         <div id="message-log-container">
-
+          <ul id="messages">
+            <p v-for="message in messageLog">
+              <span class="message-time">[ {{message.time}} ]</span>
+              &nbsp;&nbsp;
+              <span class="message-content">{{ message.message }}</span>
+            </p>
+          </ul>
         </div>
       </div>
 
@@ -550,6 +588,7 @@
             v-bind:current-player="currentPlayer"
             v-bind:key="currentPlayer.username"
             v-bind:msg="observeMsg"
+            v-bind:guess-form-msg="currentGuessFormPromptMsg"
             v-on:submit-answer="submitAnswer"
             v-on:submit-guessed-match="submitGuessedMatch"></component>
 
@@ -639,11 +678,12 @@
       props: ['avatar'],
       template: '\
         <div\
-          v-on:click="globalEmitUsernameSelected"\
-          v-on:mouseenter="activeAnimation"\
-          v-on:mouseleave="disableAnimation"\
-          v-bind:class="{animated: isActive, bounce: isActive, \'guess-pointer\': isActive}"\>\
-          <img class="avatar-image" v-bind:src="avatar.avatarUrl">\
+          v-bind:class="{animated: isActive, bounce: isOtherPlayer, shake: isCurrentPlayer, \'guess-pointer\': isActive}"\>\
+          <img\
+            v-on:click="globalEmitUsernameSelected"\
+            v-on:mouseenter="activeAnimation"\
+            v-on:mouseleave="disableAnimation"\
+            class="avatar-image" v-bind:src="avatar.avatarUrl">\
           <div class="username-container">\
             {{ avatar.username }}\
           </div>\
@@ -657,16 +697,31 @@
       },
       methods: {
         globalEmitUsernameSelected: function() {
-          this.$root.guessedResult.username = this.avatar.username;
-          EventBus.$emit('guessed-username', this.avatar);
+          if(this.avatar.username != this.$root.currentPlayer.username) {
+            this.$root.guessedResult.username = this.avatar.username;
+          } 
         },
         activeAnimation: function() {
-          console.log(this.isActive);
           this.isActive = true;
         },
         disableAnimation: function() {
-          console.log(this.isActive);
           this.isActive = false;
+        }
+      },
+      computed: {
+        isCurrentPlayer: function() {
+          if(this.avatar.username == this.$root.currentPlayer.username) {
+            return (true && this.isActive);
+          } else {
+            return false;
+          }
+        },
+        isOtherPlayer: function() {
+          if(this.avatar.username != this.$root.currentPlayer.username) {
+            return (true && this.isActive);
+          } else {
+            return false;
+          }
         }
       }
     });
@@ -679,7 +734,9 @@
           v-on:mouseenter="activeAnimation"\
           v-on:mouseleave="disableAnimation"\
           v-bind:class="{animated: isActive, swing: isActive, \'guess-pointer\': isActive}">\
-          <img class="card-border" src="https://storage.googleapis.com/studydsstore/1552259284708rectangle_box.jpg">\
+          <img\
+            v-on:click="globalEmitAnswerSelected"\
+            class="card-border" src="https://storage.googleapis.com/studydsstore/1552259284708rectangle_box.jpg">\
           <div class="answer-text-container">\
             {{ answer.useranswer }}\
           </div>\
@@ -694,25 +751,26 @@
       methods: {
         globalEmitAnswerSelected: function() {
           this.$root.guessedResult.useranswer = this.answer.useranswer;
-          EventBus.$emit('guessed-answer', this.answer);
+          // EventBus.$emit('guessed-answer', this.answer);
         },
         activeAnimation: function() {
-          console.log(this.isActive);
           this.isActive = true;
         },
         disableAnimation: function() {
-          console.log(this.isActive);
           this.isActive = false;
         }
       }
     });
 
     Vue.component('guess-form', {
-      props: ['guess'],
+      props: ['guess', 'guessFormMsg'],
       template: '\
         <div>\
+          <div id="guess-form-prompt-container">\
+            <span id="selected-self">{{ prompt }}</span>\
+          </div>\
           <div id="guess-form-container">\
-            <p>\
+            <p id="guess-form-text">\
               <span>\
                 <span id="guess-form-username">\
                   {{ guess.username }}\
@@ -729,22 +787,26 @@
             id="guess-form-button">&nbsp Match</div>\
         </div>\
       ',
+      data: function() {
+        return {
+          prompt: '',
+        }
+      },
       methods: {
         submitGuessedMatchHandler: function() {
-          if(this.guess.username == this.$root.currentPlayer.username) {
+          if(this.guess.username == '' || this.guess.username == undefined) {
             // do something
+            this.prompt = "You must choose a player!";
+            setTimeout(this.clearPrompt, 1000);
           } else {
             this.$emit('submit-guessed-match');
           }
+        },
+        clearPrompt: function() {
+          this.prompt = '';
         }
       }
     });
-
-    /*
-
-    v-on:active-animation="activeAnimation"\
-                  v-on:disable-animation="disableAnimation"\
-    */
 
     Vue.component('guess-window', {
       props: ['users', 'answers'],
@@ -870,7 +932,7 @@
         <div class="player-info">\
           <p>\
             Player: {{ player.username }}\
-            <span v-if="player.ready">\
+            <span v-if="player.ready == \'true\'">\
               ready!\
             </span>\
             <span v-else>\
@@ -928,7 +990,7 @@
             <span>{{ msg[2] }}</span>\
           </div>\
         </div>\
-      '
+      ',
     });
 
     Vue.component('observe-answer-form', {
@@ -962,7 +1024,7 @@
         // current player
         currentPlayer: {
           // assume that the players are identified by their names
-          username: 'player1', 
+          username: '', 
           avatarUrl: '',
           userId: undefined,
           points: 0,
@@ -975,17 +1037,17 @@
           // an array of player objects
           /*{
             username: 'player1',
-            avatarUrl: '',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
             ready: false
           },
           {
             username: 'player2',
-            avatarUrl: '',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
             ready: false
           },
           {
             username: 'player3',
-            avatarUrl: '',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
             ready: false
           },*/
         ],
@@ -993,22 +1055,34 @@
         submittedCards: [
           /*{
             username: 'player1',
-            useranswer: 'answer1'
+            useranswer: 'answer1',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
           },
           {
             username: 'player2',
-            useranswer: 'answer2'
+            useranswer: 'answer2',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
           },
           {
             username: 'player3',
-            useranswer: 'answer3'
+            useranswer: 'answer3',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
           },*/
         ],
         // separated two lists for shuffling in guessing stage
         submittedUsers: [
-          /*{username: 'player1'},
-          {username: 'player2'},
-          {username: 'player3'},*/
+          /*{
+            username: 'player1',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
+          },
+          {
+            username: 'player2',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
+          },
+          {
+            username: 'player3',
+            avatarUrl: 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg',
+          },*/
         ],
         // the answers of the users
         submittedAnswers: [
@@ -1033,6 +1107,7 @@
           useranswer: '',
         },
         input_msg: '',
+        messageLog: [],
       },
       methods: {
         // submitAnswer shall be triggered by player clicking "enter" button
@@ -1040,6 +1115,11 @@
         //   answer: ...    the answer of the current client 
         submitAnswer: function(answer) {
           console.log(answer.username + '......' + answer.userinput);
+
+          this.messageLog.unshift({
+            message: `You have submitted the answer`,
+            time: moment().format('h:mm:ss a')
+          });
 
           this.submittedUsers.push({
             username: answer.username,
@@ -1100,6 +1180,13 @@
                 return true;
               }
             });
+
+            this.currentPlayer.points += 1;
+
+            this.messageLog.unshift({
+              message: `You guessed correctly and got another turn`,
+              time: moment().format('h:mm:ss a')
+            });
             
             this.$socket.emit('guessMatch', { // assume usernames are unique
               username: this.currentPlayer.username,  // current player (name) guessed correctly
@@ -1110,13 +1197,35 @@
             });
           } else {
             console.log('mismatch');
-            this.$socket.emit('guessMismatch', {
-              username: this.currentPlayer.username,  // current player (name) guessed wrong
-              userId: this.currentPlayer.userId,  // current player (ID) guessed wrong
-              matchedUsername: username,      // the wrong username
-              matchedUserAnswer: useranswer,  // the wrong answer
-              roomId: this.roomId 
+            this.messageLog.unshift({
+              message: `You guessed incorrectly and gave turn to other`,
+              time: moment().format('h:mm:ss a')
             });
+
+            const node1 = document.querySelector('#guess-form-text');
+            const node2 = document.querySelector('#guess-form-button');
+            node1.classList.add('animated', 'tada');
+            node2.classList.add('animated', 'tada');
+
+            function handleAnimationEnd() {
+              node1.classList.remove('animated', 'tada');
+              node1.removeEventListener('animationend', handleAnimationEnd);
+              node2.classList.remove('animated', 'tada');
+              node2.removeEventListener('animationend', handleAnimationEnd);
+            }
+
+            node1.addEventListener('animationend', handleAnimationEnd);
+            node2.addEventListener('animationend', handleAnimationEnd);
+            
+            setTimeout(function() {
+              app.$socket.emit('guessMismatch', {
+                username: app.currentPlayer.username,  // current player (name) guessed wrong
+                userId: app.currentPlayer.userId,  // current player (ID) guessed wrong
+                matchedUsername: username,      // the wrong username
+                matchedUserAnswer: useranswer,  // the wrong answer
+                roomId: app.roomId 
+              });
+            }, 1000);
           }
         },
         gameModeTransition: function(mode) {
@@ -1142,6 +1251,11 @@
         //   userId: ...   the sessionId of the client
         // }
         currentPlayerReady: function() {
+          this.messageLog.unshift({
+            message: `You are ready`,
+            time: moment().format('h:mm:ss a')
+          });
+
           this.$socket.emit('playerStateReady', {
             roomId: this.roomId,
             username: this.currentPlayer.username,
@@ -1150,7 +1264,7 @@
 
           for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
             if(this.playersInRoom[ii].username === this.currentPlayer.username) {
-              this.playersInRoom[ii].ready = true;
+              this.playersInRoom[ii].ready = 'true';
               break;
             }
           }
@@ -1230,7 +1344,7 @@
               let strUnreadyPlayers = [];
 
               this.playersInRoom.forEach(function(player) {
-                if(player.ready === false) {
+                if(player.ready === 'false') {
                   strUnreadyPlayers.push(player.username);
                 }
               });
@@ -1265,21 +1379,23 @@
           
           // let currentPlayerAvatarUrl = '';
           if(this.firstTime) {
-            data.playerList.forEach(function(player) {
-              app.playersInRoom.push({
-                username: player.username,
-                ready: player.ready,
-                avatarUrl: player.avatar
+            for(let ii = 0; ii < data.playerList.length; ++ii) {
+              this.playersInRoom.push({
+                username: data.playerList[ii].username,
+                avatarUrl: data.playerList[ii].avatar,
+                ready: data.playerList[ii].ready === true ? 'true' : 'false'
               });
-              // if(player.username == data.username) {
-              //  currentPlayerAvatarUrl = player.avatar;
-              //}
-            });
-            this.firstTime = false;
+            }
+            this.firstTime = false; 
           }
 
           console.log(`received from server playerJoin:  
             ${data.username}    ${data.roomId}`);
+
+          this.messageLog.unshift({
+            message: `${data.username} enter into the room`,
+            time: moment().format('h:mm:ss a')
+          });
 
           if(this.roomId === undefined) {
             this.roomId = data.roomId;
@@ -1301,8 +1417,6 @@
             }
           } 
 
-          console.log(this.playersInRoom);
-
           let inGame = false;
           for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
             if(this.playersInRoom[ii].username == data.username)
@@ -1313,7 +1427,7 @@
             app.playersInRoom.push({
               username: data.username,
               avatarUrl: data.avatarUrl,
-              ready: data.ready
+              ready: data.ready === true ? 'true' : 'false'
             });
           }
         },
@@ -1321,6 +1435,11 @@
         playerLeave: function(data) {
           console.log(`received from server playerLeave:  
             ${data.username}    ${data.roomId}`);
+
+          this.messageLog.unshift({
+            message: `${data.username} leaves the room`,
+            time: moment().format('h:mm:ss a')
+          });
 
           this.playersInRoom = this.playersInRoom.filter(function(player) {
             if(player.username == data.username) {
@@ -1334,12 +1453,25 @@
         playerReady: function(data) {
           this.playersInRoom.forEach(function(player) {
             if(player.username == data.username) {
-              player.ready = true;
+              player.ready = 'true';
             }
           });
+          if(data.username != this.currentPlayer.username) {
+            this.messageLog.unshift({
+              message: `${data.username} is ready`,
+              time: moment().format('h:mm:ss a')
+            });
+          }
         },
         answer: function(data) {
           console.log(`${data.username}   ${data.useranswer}`);
+          if(data.username != this.currentPlayer.username) {
+            this.messageLog.unshift({
+              message: `${data.username} has submitted answer`,
+              time: moment().format('h:mm:ss a')
+            });
+          }
+          
           //if(data.roomId == this.roomId) {
             if(data.username != this.currentPlayer.username) {
               this.submittedAnswers.push({
@@ -1367,6 +1499,18 @@
         },
         playerOut: function(data) {
           console.log(`playerOut received from server  ${data}`);
+          if(data.username == this.currentPlayer.username) {
+            this.messageLog.unshift({
+              message: `You are out of round`,
+              time: moment().format('h:mm:ss a')
+            });
+          } else {
+            this.messageLog.unshift({
+              message: `${data.username} is out of round`,
+              time: moment().format('h:mm:ss a')
+            });
+          }
+          
           if(this.roomId == data.roomId) {
             if(data.username == this.currentPlayer.username) {
               // if the username sent by backend is same as current client's 
@@ -1380,6 +1524,11 @@
           if(this.roomId == data.roomId) {
             let username = data.username;
             let useranswer = data.useranswer;
+
+            this.messageLog.unshift({
+              message: `A guess is matched: ${data.username} => ${data.useranswer}`,
+              time: moment().format('h:mm:ss a') 
+            });
 
             this.submittedCards = this.submittedCards.filter(function(card) {
               if((card.username !== username) || (card.useranswer !== useranswer)) {
@@ -1407,6 +1556,18 @@
         playerTurn: function(data) {
           console.log(`Received from server playerTurn 
             ${data.roomId}  ${data.username}`);
+          if(data.username == this.currentPlayer.username) {
+            this.messageLog.unshift({
+              message: `Currently it is your turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
+          } else {
+            this.messageLog.unshift({
+              message: `Currently it is ${data.username}'s turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
+          }
+          
           // if(data.userId == this.currentPlayer.userId)
           if(data.username == this.currentPlayer.username) {
             // When backend pick a user to guess, if data.username
@@ -1418,7 +1579,11 @@
           }
         },
         newRound: function(data) {
-          console.log(`Received from server playerTurn ${data}`)
+          console.log(`Received from server playerTurn ${data}`);
+          this.messageLog.unshift({
+            message: `An new round is started, wait for all the players ready`,
+            time: moment().format('h:mm:ss a')
+          });
           // When some signals are received, change the game components 
           // related to 'answers'
           this.currentGameMode = 'wait';
@@ -1431,26 +1596,47 @@
         },
         gameStateAnswer: function(data) {
           console.log(`Received from server gameStateAnswer ${data.question}`);
+          this.messageLog.unshift({
+            message: `Currently the game is in the answering stage`,
+            time: moment().format('h:mm:ss a')
+          });
           // do something that let current player know game state changed
           this.currentGameMode = 'answer';
           this.currentCard = data.question;
         },
         gameStateGuess: function(data) {
           console.log(`Received from server gameStateGuess ${data.username}`);
+          this.messageLog.unshift({
+            message: `Currently the game is in the guessing stage`,
+            time: moment().format('h:mm:ss a') 
+          });
           if(data.username == this.currentPlayer.username) {
             this.currentGameMode = 'guess';
+            this.messageLog.unshift({
+              message: `You got a turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
           } else {
             this.currentGameMode = 'observe guess';
+            this.messageLog.unshift({
+              message: `${data.username} got a turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
           }
         },
         gameStateEnd: function() {
           console.log(`Received from server gameStateEnd`);
+          this.messageLog.unshift({
+            message: `The current round is end`,
+            time: moment().format('h:mm:ss a')
+          });
+
           this.$socket.emit('newRound', {
             roomId: this.roomId
           });
 
           this.playersInRoom.forEach(function(player) {
-            player.ready = false;
+            player.ready = 'false';
           });
           this.submittedAnswers = [];
           this.submittedUsers = [];
