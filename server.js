@@ -196,8 +196,14 @@ app.get('/game/', function(req,res){
 // testing for random room generation
 app.get('/:roomId/', function(req,res){
     //console.log(req.params.room);
-    //console.log(roomList);
-    console.log(req.sessionID)
+    //console.log('appget roomlist: ' + roomList);
+    //console.log(req.sessionID)
+    //console.log('check session: ' + req.session.roomId)
+    let found = getRoomObject(req.params.roomId);
+    if(found !== undefined && found.status !== 'waiting'){
+        console.log('game in progress for room: ' + req.param.roomId)
+        res.redirect('/');
+    }
     if(roomList.includes(req.params.roomId)){
         try {
             //const result = await getCard();
@@ -239,20 +245,20 @@ io.on('connection', function(socket){
     
     try{
         let found = getRoomObject(socket.handshake.session.roomId);
+        let playerNames = [] = found.getPlayerNames();
         // ADD player to the game's playerList
         if(found != undefined && found.status === 'waiting'){
             socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
             if(found.playerList.length === 0) // the room is empty
                 found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
-            found.playerList.find(function(element){
-                if(element.username === socket.handshake.session.username)
-                    console.log('player: ' + socket.handshake.session.username + " already in room")
-                else{
-                    found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
-                    console.log('added new player: ' + socket.handshake.session.username);
-                }
-            })
-            //let playerNames = found.getPlayerNames()
+            // new player
+            if(!playerNames.includes(socket.handshake.session.username)){
+                found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
+                console.log('added new player: ' + socket.handshake.session.username);
+            }
+            else
+                console.log("player: " + socket.handshake.session.username + " already in room")
+            
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
@@ -423,6 +429,7 @@ io.on('connection', function(socket){
             let roomNumber = socket.handshake.session.roomId;
             if(room !== undefined){
                 room.removePlayer(playerName)
+                console.log('players left in room: ' + room.getPlayerNames());
                 // remove player's roomId from the session object,
                 // in case they go to the home page
                 socket.handshake.session.roomId = undefined;
