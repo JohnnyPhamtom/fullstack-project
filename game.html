@@ -1556,6 +1556,7 @@
         playerTurn: function(data) {
           console.log(`Received from server playerTurn 
             ${data.roomId}  ${data.username}`);
+
           if(data.username == this.currentPlayer.username) {
             this.messageLog.unshift({
               message: `Currently it is your turn to guess a match`,
@@ -1567,15 +1568,16 @@
               time: moment().format('h:mm:ss a')
             });
           }
-          
-          // if(data.userId == this.currentPlayer.userId)
-          if(data.username == this.currentPlayer.username) {
-            // When backend pick a user to guess, if data.username
-            // is equal to current client's username
-            // change the game components related to 'guess'
-            this.currentGameMode = 'guess';
-          } else {
-            this.currentGameMode = 'observe guess';
+         
+          if(this.currentGameMode === 'guess' || this.currentGameMode === 'observe guess') {
+            if(data.username == this.currentPlayer.username) {
+              // When backend pick a user to guess, if data.username
+              // is equal to current client's username
+              // change the game components related to 'guess'
+              this.currentGameMode = 'guess';
+            } else {
+              this.currentGameMode = 'observe guess';
+            }
           }
         },
         newRound: function(data) {
