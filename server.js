@@ -59,7 +59,7 @@ function randomInt(max){
 function cleanRooms(){
     var len = roomList.length;
     for(var i = 0; i < len; i++){
-        if(roomObject[i].playerList === []){
+        if(roomObject[i].playerList.length === 0){
             roomObject.splice(i,1);
             roomList.splice(i,1);
         }
@@ -234,7 +234,7 @@ io.on('connection', function(socket){
     console.log(socket.id + ' a user connected');
     console.log("inside a socket conn:" + socket.handshake.sessionID);
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
-    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId);   
+    console.log('socket conn: roomID:: ' + socket.handshake.session.roomId); 
     // ‘gameStateWait’ - allow players to enter the room    
     
     try{
@@ -242,7 +242,8 @@ io.on('connection', function(socket){
         // ADD player to the game's playerList
         if(found != undefined && found.status === 'waiting'){
             socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
-            console.log(found.playerList);
+            if(found.playerList.length === 0) // the room is empty
+                found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
             found.playerList.find(function(element){
                 if(element.username === socket.handshake.session.username)
                     console.log('player: ' + socket.handshake.session.username + " already in room")
@@ -369,6 +370,7 @@ io.on('connection', function(socket){
     // reset all players to waiting status
     io.on('newRound', function(data){
         let room = getRoomObject(data.roomId);
+        room.activePlayers = [];
         room.playerList.forEach(element => {
             room.playerStatusUpdate(element.username, 'waiting');
         });
@@ -414,16 +416,23 @@ io.on('connection', function(socket){
 
     // moved playerLeave to socket disconnect
     socket.on('disconnect', function(){
-        console.log(socket.handshake.session.username + ' : user disconnected');
+        console.log(socket.handshake.session.username + ' : user disconnected'); 
         try {
             let playerName = socket.handshake.session.username;
             let room = getRoomObject(socket.handshake.session.roomId)
             let roomNumber = socket.handshake.session.roomId;
             if(room !== undefined){
                 room.removePlayer(playerName)
+                // remove player's roomId from the session object,
+                // in case they go to the home page
+                socket.handshake.session.roomId = undefined;
+                socket.handshake.session.save();
                 io.to(roomNumber).emit('playerLeave', {
                     username: playerName,
                 });
+                if(room.playerList.length === 0)
+                    console.log('the list is empty. room state changes')
+                    room.gameStatusUpdate('waiting');
             }
         }catch{
             console.log('failed on playerLeave');
