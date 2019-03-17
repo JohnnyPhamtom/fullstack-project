@@ -335,8 +335,8 @@ io.on('connection', function(socket){
             ${data.username} ${data.userId} \
             ==> ${data.matchedUsername} ${data.matchedUserAnswer}');
         let room = getRoomObject(data.roomId);
-        room.playerOut(data.username);
-        console.log('playerOut fn: ' + data.username);
+        room.playerOut(data.matchedUsername);
+        console.log('playerOut fn: ' + data.matchedUsername);
         console.log(room);
         // ‘playerOut’’ - event for when a player is out of the round, should follow a ‘guessMatch’
         io.to(data.roomId).emit('playerOut', {
