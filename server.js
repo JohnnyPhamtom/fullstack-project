@@ -17,6 +17,15 @@ var session = require('express-session')({
 var bodyParser = require('body-parser');
 var ios = require('socket.io-express-session');
 
+// CHANGED START -------------------------------------------------------
+// mustache is used to render error page
+
+var mustache = require('mustache');
+var fs = require('fs');
+
+// CHANGED END --------------------------------------------------------
+
+
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
 
@@ -39,6 +48,8 @@ app.use(bodyParser.urlencoded({
 }*/
 var roomList = [];
 var roomObject = [];
+
+var onlineUsers = [];
 
 // ON USING DATASTORE: found at https://cloud.google.com/appengine/docs/standard/nodejs/using-cloud-datastore
 // By default, the client will authenticate using the service account file
@@ -127,8 +138,41 @@ app.get('/suggestrooms',function(req,res){
 // Simpler front page. All it will do is serve an html page and await a form submission
 app.get('/', function(req,res){
     console.log('front.html:: ' + req.sessionID);
-    //res.json({roomList: {roomList}});
-    res.sendFile(__dirname + '/front.html');
+
+    // CHANGED START ------------------------------------------------------------
+    // When a user attempts access front page, check whether the user has 
+    // already in game. If it is, send the error page; otherwise, send the
+    // front page
+
+    console.log(onlineUsers);
+    let inGameSessionId = false;
+    let playerInfo = undefined;
+    onlineUsers.forEach(function(player) {
+        if(player.userId == req.sessionID) {
+            inGameSessionId = true;
+            playerInfo = {
+                username: player.username,
+                userId: player.userId,
+                roomId: player.roomId,
+                message: 'You have already joined a game. Following is the player information.'
+            }
+        }
+    });
+    if(inGameSessionId) {
+        // res.sendFile(__dirname + '/error.html');
+        fs.readFile(__dirname + '/error.html', function(err, data) {
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.write(mustache.render(data.toString(), playerInfo));
+            res.end();
+        });
+    } else {
+        //res.json({roomList: {roomList}});
+        res.sendFile(__dirname + '/front.html');  
+    }
+
+    // CHANGED END --------------------------------------------------------
 });
 app.get('/roomlist', function(req,res){
     res.json({roomList});
@@ -199,35 +243,96 @@ app.get('/:roomId/', function(req,res){
     //console.log('appget roomlist: ' + roomList);
     //console.log(req.sessionID)
     //console.log('check session: ' + req.session.roomId)
+
     let found = getRoomObject(req.params.roomId);
     if(found !== undefined && found.status !== 'waiting'){
         console.log('game in progress for room: ' + req.param.roomId)
-        res.redirect('/');
-    }
-    if(roomList.includes(req.params.roomId)){
-        try {
-            //const result = await getCard();
-            //const entities = result[0];
-            //const card = entities.map( entity => `${entity.Text}`);
-            //console.log(card)
-            //res.status(200);
-            //res.contentType('text/html');
-            //res.write(card.toString());
-            res.sendFile(__dirname + '/game.html');
-            //res.end();
-        }catch(error){
-            console.log(error);
-        }
-        
-    }else {
-        console.log('room not found :: ' + req.params.roomId)
-        res.redirect('/');
-        /*
-        res.status(200);
-        res.contentType('text/html');
-        res.write('room not found: '+ req.params.roomId);
-        res.end();
-        */
+
+        // CHANGE START ------------------------------------------------------------
+
+        // res.redirect('/');
+        fs.readFile(__dirname + '/error.html', function(err, data) {
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.write(mustache.render(data.toString(), {
+                username: req.session.username,
+                userId: req.sessionID,
+                roomId: req.params.roomId,
+                message: 'You cannot join a game which is playing.'
+            }));
+            res.end();
+        });
+    } else {
+        let inGameSessionId = false;
+        let playerInfo = undefined;
+        onlineUsers.forEach(function(player) {
+            if(player.userId == req.sessionID) {
+                inGameSessionId = true;
+                playerInfo = {
+                    username: player.username,
+                    userId: player.userId,
+                    roomId: player.roomId,
+                    message: 'You have already joined a game. Following is the player information.'
+                }
+            }
+        }); 
+        if(inGameSessionId) {
+            // res.sendFile(__dirname + '/error.html');
+            fs.readFile(__dirname + '/error.html', function(err, data) {
+                res.writeHead(200, {
+                    'Content-Type': 'text/html'
+                });
+                res.write(mustache.render(data.toString(), playerInfo));
+                res.end();
+            });
+        } else {
+
+        // CHANGE END ------------------------------------------------------------
+
+            if(roomList.includes(req.params.roomId)){
+                try {
+                    //const result = await getCard();
+                    //const entities = result[0];
+                    //const card = entities.map( entity => `${entity.Text}`);
+                    //console.log(card)
+                    //res.status(200);
+                    //res.contentType('text/html');
+                    //res.write(card.toString());
+                    res.sendFile(__dirname + '/game.html');
+                    //res.end();
+                }catch(error){
+                    console.log(error);
+                }
+            }else {
+                console.log('room not found :: ' + req.params.roomId)
+
+                // CHANGED START ------------------------------------------------------------
+
+                // res.redirect('/');
+                fs.readFile(__dirname + '/error.html', function(err, data) {
+                    res.writeHead(200, {
+                        'Content-Type': 'text/html'
+                    });
+                    res.write(mustache.render(data.toString(), {
+                        username: req.session.username,
+                        userId: req.sessionID,
+                        roomId: req.params.roomId,
+                        message: 'Cannot find any room with entered room ID'
+                    }));
+                    res.end();
+                });
+
+                // CHANGED END ----------------------------------------------------------------
+
+                /*
+                res.status(200);
+                res.contentType('text/html');
+                res.write('room not found: '+ req.params.roomId);
+                res.end();
+                */
+            }
+        } 
     }
 });
 
@@ -242,23 +347,44 @@ io.on('connection', function(socket){
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
     console.log('socket conn: roomID:: ' + socket.handshake.session.roomId); 
     // ‘gameStateWait’ - allow players to enter the room    
-    
+
+    // CHANGED START ------------------------------------------------------------
+    // when a user is in game, add it to onlineUsers list
+
+    onlineUsers.push({
+        userId: socket.handshake.sessionID,
+        username: socket.handshake.session.username,
+        roomId: socket.handshake.session.roomId
+    });
+
+    // CHANGED END --------------------------------------------------------------
+
     try{
         let found = getRoomObject(socket.handshake.session.roomId);
-        let playerNames = [] = found.getPlayerNames();
+        let playerNames = found.getPlayerNames();
         // ADD player to the game's playerList
         if(found != undefined && found.status === 'waiting'){
-            socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
-            if(found.playerList.length === 0) // the room is empty
-                found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
+        socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
+        if(found.playerList.length === 0) // the room is empty
+            found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
             // new player
-            if(!playerNames.includes(socket.handshake.session.username)){
+
+            // CHANGED START -------------------------------------------------------------------
+            // playerNames has been changed when found.addPlayer is called, so this is the reason
+            // that caused repeated names bug
+
+            if(!found.getPlayerNames().includes(socket.handshake.session.username)){
+
+            // CHANGED END -------------------------------------------------------------------
+
                 found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
                 console.log('added new player: ' + socket.handshake.session.username);
             }
             else
                 console.log("player: " + socket.handshake.session.username + " already in room")
-            
+               
+            console.log('-------------------- playerlist --------------------')
+            console.log(found.playerList);
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
@@ -267,6 +393,7 @@ io.on('connection', function(socket){
                 avatarUrl: socket.handshake.session.avatarUrl,  // <<== changed
                 playerList: found.playerList, 
             });
+            console.log('--------------------------------------------------')
         }
         else {
             console.log('room status: ' + found.status);
@@ -427,6 +554,20 @@ io.on('connection', function(socket){
             let playerName = socket.handshake.session.username;
             let room = getRoomObject(socket.handshake.session.roomId)
             let roomNumber = socket.handshake.session.roomId;
+
+            // CHANGED START ------------------------------------------------------------
+            // Remove disconnected user from onlineUser list
+
+            onlineUsers = onlineUsers.filter(function(player) {
+                if(player.userId == socket.handshake.sessionID) {
+                    return false;
+                } else {
+                    return true;
+                }
+            });
+
+            // CHANGED END --------------------------------------------------------
+
             if(room !== undefined){
                 room.removePlayer(playerName)
                 console.log('players left in room: ' + room.getPlayerNames());
