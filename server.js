@@ -215,6 +215,7 @@ app.post('/', async function(req,res){
         }
         req.session.roomId = req.params.roomId;
         req.session.avatarUrl = req.body.avatarUrl;
+        req.session.save(); 
         console.log(`Avatar:  ${req.session.avatarUrl}`);
         res.redirect('/'+ req.params.roomId);
     }
@@ -507,6 +508,7 @@ io.on('connection', function(socket){
         room.playerList.forEach(element => {
             room.playerStatusUpdate(element.username, 'waiting');
         });
+        room.gameStatusUpdate('waiting');
         io.to(data.roomId).emit('newRound');
     });
 
@@ -578,6 +580,17 @@ io.on('connection', function(socket){
                 io.to(roomNumber).emit('playerLeave', {
                     username: playerName,
                 });
+                // ‘gameStateEnd’ - if someone gets disconnected in the middle of a round, remove them
+                room.playerOut(playerName)
+                io.to(roomNumber).emit('playerOut', {
+                    roomId: roomNumber,
+                    username: playerName,
+                });
+                if(room.activePlayers.length <= 1){
+                    io.to(data.roomId).emit('gameStateEnd');
+                    room.gameStatusUpdate('end');
+                    room.activePlayers = [];
+                }
                 if(room.playerList.length === 0)
                     console.log('the list is empty. room state changes')
                     room.gameStatusUpdate('waiting');
