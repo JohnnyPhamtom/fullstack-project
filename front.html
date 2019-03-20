@@ -374,6 +374,20 @@
       .component-fade-enter, .component-fade-leave-to {
         opacity: .0;
       }
+
+      .ui-menu {
+        border: solid;
+        position: absolute;
+        width: 20%;
+        right: 2px;
+        top: 70%;
+        height: 10%;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        background-color: white;
+      }
+
+      
     </style>
   </head>
   <body>
@@ -423,7 +437,7 @@
             <button id="join">Join/Create</button>
           </form>
         </div>
-        <pre id="output"></pre>
+        <pre id="auto-output" class="ui-front"></pre>
       </div>
 
       <transition name="component-fade" mode="out-in">
@@ -681,6 +695,7 @@
     // jquery-ui method for auto-complete
     $("#roomId")
       .autocomplete({
+        appendTo: "#auto-output",
         source: function(req,res) {
           $.ajax({
             'type': 'GET',

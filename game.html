@@ -1016,6 +1016,7 @@
     // vue-socket.io-extended set up
     Vue.use(VueSocketIOExt, io('http://localhost:3000'));
 
+
     // The top level component: app
     let app = new Vue({
       el: '#app',
@@ -1107,6 +1108,7 @@
           useranswer: '',
         },
         input_msg: '',
+        newRoundMsg: false,
         messageLog: [],
       },
       methods: {
@@ -1383,7 +1385,7 @@
               this.playersInRoom.push({
                 username: data.playerList[ii].username,
                 avatarUrl: data.playerList[ii].avatar,
-                ready: data.playerList[ii].ready === true ? 'true' : 'false'
+                ready: data.playerList[ii].status == 'ready' ? 'true' : 'false'
               });
             }
             this.firstTime = false; 
@@ -1582,10 +1584,13 @@
         },
         newRound: function(data) {
           console.log(`Received from server playerTurn ${data}`);
-          this.messageLog.unshift({
-            message: `An new round is started, wait for all the players ready`,
-            time: moment().format('h:mm:ss a')
-          });
+          if(!this.newRoundMsg) {
+            this.messageLog.unshift({
+              message: `An new round is started, wait for all the players ready`,
+              time: moment().format('h:mm:ss a')
+            });
+            this.newRoundMsg = true;
+          }
           // When some signals are received, change the game components 
           // related to 'answers'
           this.currentGameMode = 'wait';
@@ -1632,6 +1637,8 @@
             message: `The current round is end`,
             time: moment().format('h:mm:ss a')
           });
+
+          this.newRoundMsg = false;
 
           this.$socket.emit('newRound', {
             roomId: this.roomId
