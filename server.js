@@ -59,8 +59,7 @@ var roomGuesser = {};
 const Datastore = require('@google-cloud/datastore');
 
 //Instantiate a datastore client
-const projectId = 'studydsstore';
-const datastore = Datastore({projectId: projectId});
+const datastore = Datastore({projectId: 'fs-things'});
 // From MDN: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 function randomInt(max){
     return Math.floor(Math.random() * max);
@@ -110,12 +109,12 @@ async function getCard() {
     const min = 0;
     const max = 3;
     const query = datastore
-    .createQuery('card')
-    //.filter('Index', '>=', min)
-    //.filter('Index', '<', max)
+    .createQuery('Card')
+    .filter('Index', '>=', min)
+    .filter('Index', '<', max)
     //.filter('Index', '=', randNum)
-    //.order('Index', {descending: true})
-    //.limit(10);
+    .order('Index', {descending: true})
+    .limit(10);
     return datastore.runQuery(query);
 }
 // Handle ajax request for data in suggestrooms

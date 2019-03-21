@@ -11,7 +11,7 @@
     <link href='https://fonts.googleapis.com/css?family=Courgette' rel='stylesheet'>
     <link href='https://fonts.googleapis.com/css?family=Kalam' rel='stylesheet'>
 
-    <script type="text/javascript" src="https://studydsstore.appspot.com/socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="https://localhost:3000/socket.io/socket.io.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.slim.js"></script>
@@ -1011,7 +1011,7 @@
     const EventBus = new Vue();
 
     // vue-socket.io-extended set up
-    Vue.use(VueSocketIOExt, io('https://studydsstore.appspot.com'));
+    Vue.use(VueSocketIOExt, io('http://localhost:3000'));
 
 
     // The top level component: app
