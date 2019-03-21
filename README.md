@@ -6,8 +6,17 @@ https://fs-things.appspot.com
 
 ### Build
 ***
-` npm install `  
-` npm start ` or ` node server.js `
+``` 
+    npm install  
+    npm start 
+```
+or
+
+``` 
+    npm install  
+    node server.js
+```
+
 
 ### Our app is deployed on Google Cloud Platform
 ***
