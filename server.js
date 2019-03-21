@@ -4,7 +4,10 @@ require('@google-cloud/debug-agent').start();
 const gameManager = require('./newGame');
 var app = require('express')();
 var http = require('http').Server(app);
-var io = require('socket.io')(http);
+var io = require('socket.io')(http, {
+    pingTimeout: 2000,
+    pingInterval: 5000
+});
 var session = require('express-session')({
     name: 'session',
     secret: 'things_game',
@@ -16,6 +19,10 @@ var session = require('express-session')({
     });
 var bodyParser = require('body-parser');
 var ios = require('socket.io-express-session');
+
+var mustache = require('mustache');
+var fs = require('fs');
+
 
 // For the app being behind a front-facing proxy
 app.enable('trust proxy');
@@ -39,6 +46,9 @@ app.use(bodyParser.urlencoded({
 }*/
 var roomList = [];
 var roomObject = [];
+var onlineUsers = [];
+var roomGuesser = {};
+
 
 // ON USING DATASTORE: found at https://cloud.google.com/appengine/docs/standard/nodejs/using-cloud-datastore
 // By default, the client will authenticate using the service account file
@@ -49,7 +59,7 @@ var roomObject = [];
 const Datastore = require('@google-cloud/datastore');
 
 //Instantiate a datastore client
-const datastore = Datastore();
+const datastore = Datastore({projectId: 'fs-things'});
 // From MDN: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 function randomInt(max){
     return Math.floor(Math.random() * max);
@@ -127,8 +137,33 @@ app.get('/suggestrooms',function(req,res){
 // Simpler front page. All it will do is serve an html page and await a form submission
 app.get('/', function(req,res){
     console.log('front.html:: ' + req.sessionID);
-    //res.json({roomList: {roomList}});
-    res.sendFile(__dirname + '/front.html');
+    console.log(onlineUsers);
+    let inGameSessionId = false;
+    let playerInfo = undefined;
+    onlineUsers.forEach(function(player) {
+        if(player.userId == req.sessionID) {
+            inGameSessionId = true;
+            playerInfo = {
+                username: player.username,
+                userId: player.userId,
+                roomId: player.roomId,
+                message: 'You have already joined a game. Following is the player information.'
+            }
+        }
+    });
+    if(inGameSessionId) {
+        // res.sendFile(__dirname + '/error.html');
+        fs.readFile(__dirname + '/error.html', function(err, data) {
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.write(mustache.render(data.toString(), playerInfo));
+            res.end();
+        });
+    } else {
+        //res.json({roomList: {roomList}});
+        res.sendFile(__dirname + '/front.html');  
+    }
 });
 app.get('/roomlist', function(req,res){
     res.json({roomList});
@@ -157,20 +192,43 @@ app.get('/', async function(req,res){
 app.post('/', async function(req,res){
         console.log("onPOST:: " + req.body.username)
         console.log(req.session.username)
-        req.session.username = req.body.username;
+        if(req.body.username == '' || req.body.username == undefined){
+            req.session.username = 'Player_' + Math.random().toString(36).replace('0.', '').substr(0,6); 
+        } else {
+            req.session.username = req.body.username;
+        }
+        if(req.body.avatarUrl == '' || req.body.avatarUrl == undefined){
+            req.session.avatarUrl = 'https://storage.googleapis.com/studydsstore/1552259322551avatar1.jpg';
+        } else {
+            req.session.avatarUrl = req.body.avatarUrl;
+        }
         console.log(req.body.roomId)
         try { 
         if(req.body.roomId){
             //console.log('true')
             req.params.roomId = req.body.roomId;
+            let found = getRoomObject(req.body.roomId); 
+            let nameExist = false;
+            if(found != undefined){
+                found.playerList.forEach(function(player){
+                    if(player.username == req.body.username){
+                        nameExist = true;
+                    }
+                });
+                if(nameExist){
+                    req.session.username = req.body.username
+                        .concat('_' + Math.random().toString(36).replace('0.', '').substr(0,6));
+               }
+            }
         }
         else{
             //when creating a new room, we need to query data and load up the cards
-            req.params.roomId = await newRoom(req.body.username, req.body.avatarUrl);
+            req.params.roomId = await newRoom(req.session.username, req.session.avatarUrl);
             console.log(req.params.roomId)
         }
         req.session.roomId = req.params.roomId;
-        req.session.avatarUrl = req.body.avatarUrl;
+        // req.session.avatarUrl = req.body.avatarUrl;
+        req.session.save(); 
         console.log(`Avatar:  ${req.session.avatarUrl}`);
         res.redirect('/'+ req.params.roomId);
     }
@@ -199,35 +257,87 @@ app.get('/:roomId/', function(req,res){
     //console.log('appget roomlist: ' + roomList);
     //console.log(req.sessionID)
     //console.log('check session: ' + req.session.roomId)
+
     let found = getRoomObject(req.params.roomId);
     if(found !== undefined && found.status !== 'waiting'){
         console.log('game in progress for room: ' + req.param.roomId)
-        res.redirect('/');
-    }
-    if(roomList.includes(req.params.roomId)){
-        try {
-            //const result = await getCard();
-            //const entities = result[0];
-            //const card = entities.map( entity => `${entity.Text}`);
-            //console.log(card)
-            //res.status(200);
-            //res.contentType('text/html');
-            //res.write(card.toString());
-            res.sendFile(__dirname + '/game.html');
-            //res.end();
-        }catch(error){
-            console.log(error);
-        }
-        
-    }else {
-        console.log('room not found :: ' + req.params.roomId)
-        res.redirect('/');
-        /*
-        res.status(200);
-        res.contentType('text/html');
-        res.write('room not found: '+ req.params.roomId);
-        res.end();
-        */
+
+        // res.redirect('/');
+        fs.readFile(__dirname + '/error.html', function(err, data) {
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.write(mustache.render(data.toString(), {
+                username: req.session.username,
+                userId: req.sessionID,
+                roomId: req.params.roomId,
+                message: 'You cannot join a game which is playing.'
+            }));
+            res.end();
+        });
+    } else {
+        let inGameSessionId = false;
+        let playerInfo = undefined;
+        onlineUsers.forEach(function(player) {
+            if(player.userId == req.sessionID) {
+                inGameSessionId = true;
+                playerInfo = {
+                    username: player.username,
+                    userId: player.userId,
+                    roomId: player.roomId,
+                    message: 'You have already joined a game. Following is the player information.'
+                }
+            }
+        }); 
+        if(inGameSessionId) {
+            // res.sendFile(__dirname + '/error.html');
+            fs.readFile(__dirname + '/error.html', function(err, data) {
+                res.writeHead(200, {
+                    'Content-Type': 'text/html'
+                });
+                res.write(mustache.render(data.toString(), playerInfo));
+                res.end();
+            });
+        } else {
+            if(roomList.includes(req.params.roomId)){
+                try {
+                    //const result = await getCard();
+                    //const entities = result[0];
+                    //const card = entities.map( entity => `${entity.Text}`);
+                    //console.log(card)
+                    //res.status(200);
+                    //res.contentType('text/html');
+                    //res.write(card.toString());
+                    res.sendFile(__dirname + '/game.html');
+                    //res.end();
+                }catch(error){
+                    console.log(error);
+                }
+            }else {
+                console.log('room not found :: ' + req.params.roomId)
+
+                // res.redirect('/');
+                fs.readFile(__dirname + '/error.html', function(err, data) {
+                    res.writeHead(200, {
+                        'Content-Type': 'text/html'
+                    });
+                    res.write(mustache.render(data.toString(), {
+                        username: req.session.username,
+                        userId: req.sessionID,
+                        roomId: req.params.roomId,
+                        message: 'Cannot find any room with entered room ID'
+                    }));
+                    res.end();
+                });
+
+                /*
+                res.status(200);
+                res.contentType('text/html');
+                res.write('room not found: '+ req.params.roomId);
+                res.end();
+                */
+            }
+        } 
     }
 });
 
@@ -242,23 +352,34 @@ io.on('connection', function(socket){
     console.log('socket conn: uname:: ' + socket.handshake.session.username);
     console.log('socket conn: roomID:: ' + socket.handshake.session.roomId); 
     // ‘gameStateWait’ - allow players to enter the room    
-    
+
+    onlineUsers.push({
+        userId: socket.handshake.sessionID,
+        username: socket.handshake.session.username,
+        roomId: socket.handshake.session.roomId
+    });
+
     try{
         let found = getRoomObject(socket.handshake.session.roomId);
-        let playerNames = [] = found.getPlayerNames();
+        let playerNames = found.getPlayerNames();
         // ADD player to the game's playerList
         if(found != undefined && found.status === 'waiting'){
+            roomGuesser[socket.handshake.session.roomId] = undefined;
+            
             socket.join(socket.handshake.session.roomId); // add the roomId for socket communication
+            
             if(found.playerList.length === 0) // the room is empty
                 found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
             // new player
-            if(!playerNames.includes(socket.handshake.session.username)){
+            if(!found.getPlayerNames().includes(socket.handshake.session.username)){
                 found.addPlayer(socket.handshake.session.username, socket.handshake.session.avatarUrl);
                 console.log('added new player: ' + socket.handshake.session.username);
             }
             else
                 console.log("player: " + socket.handshake.session.username + " already in room")
-            
+               
+            console.log('-------------------- playerlist --------------------')
+            console.log(found.playerList);
             io.to(socket.handshake.session.roomId).emit('playerJoin', {
                 username: socket.handshake.session.username,
                 userId: socket.handshake.sessionID,             // <<== changed
@@ -267,6 +388,7 @@ io.on('connection', function(socket){
                 avatarUrl: socket.handshake.session.avatarUrl,  // <<== changed
                 playerList: found.playerList, 
             });
+            console.log('--------------------------------------------------')
         }
         else {
             console.log('room status: ' + found.status);
@@ -320,7 +442,8 @@ io.on('connection', function(socket){
                 console.log('starting player is : ' + startingPlayer);
                 io.to(roomNumber).emit('gameStateGuess', {
                     username: startingPlayer
-                })
+                });
+                roomGuesser[roomNumber] = startingPlayer;
             }
 
         }catch{
@@ -355,6 +478,7 @@ io.on('connection', function(socket){
              io.to(data.roomId).emit('gameStateEnd');
              room.gameStatusUpdate('end');
              room.activePlayers = [];
+             roomGuesser[data.roomId] = undefined;
          }
     })
     // ‘guessMismatch’ - event for when the CURRENT TURN player guesses wrong
@@ -369,18 +493,21 @@ io.on('connection', function(socket){
             roomId: data.roomId,
             username: next,
         });
+        roomGuesser[data.roomId] = next;
     });
    
     
     // ‘newRound’ - event for everyone to know the next round has started
     // reset all players to waiting status
-    io.on('newRound', function(data){
+    socket.on('newRound', function(data){
         let room = getRoomObject(data.roomId);
         room.activePlayers = [];
         room.playerList.forEach(element => {
             room.playerStatusUpdate(element.username, 'waiting');
         });
+        room.gameStatusUpdate('waiting');
         io.to(data.roomId).emit('newRound');
+        roomGuesser[data.roomId] = undefined;
     });
 
     // ‘playerStateReady’ - event to let the server know a player is ready.
@@ -427,6 +554,15 @@ io.on('connection', function(socket){
             let playerName = socket.handshake.session.username;
             let room = getRoomObject(socket.handshake.session.roomId)
             let roomNumber = socket.handshake.session.roomId;
+
+            onlineUsers = onlineUsers.filter(function(player) {
+                if(player.userId == socket.handshake.sessionID) {
+                    return false;
+                } else {
+                    return true;
+                }
+            });
+
             if(room !== undefined){
                 room.removePlayer(playerName)
                 console.log('players left in room: ' + room.getPlayerNames());
@@ -437,11 +573,51 @@ io.on('connection', function(socket){
                 io.to(roomNumber).emit('playerLeave', {
                     username: playerName,
                 });
-                if(room.playerList.length === 0)
+                // ‘gameStateEnd’ - if someone gets disconnected in the middle of a round, remove them
+                room.playerOut(playerName)
+                io.to(roomNumber).emit('playerOut', {
+                    roomId: roomNumber,
+                    username: playerName,
+                });
+                if(room.activePlayers.length <= 1 && room.status != 'waiting'){
+                    io.to(roomNumber).emit('gameStateEnd');
+                    room.gameStatusUpdate('waiting');
+                    room.activePlayers = [];
+                    // if there is only one player left, change its status to waiting regardless of 
+                    // previous status.
+                    room.playerList.forEach(function(player) {
+                        player.status = 'waiting';
+                        player.ready = false;
+                    });
+                }
+                if(room.playerList.length === 0) {
                     console.log('the list is empty. room state changes')
                     room.gameStatusUpdate('waiting');
+                }
+                // after one player left, all the players' status are answered, changed current game 
+                // state to guess
+                if(room.playerList.length > 1 
+                    && room.activePlayers.length > 1 
+                    && room.playerListStatus('answered')) {
+                    if(roomGuesser[roomNumber] === undefined) {
+                        let startingPlayer = room.activePlayers[randomInt(room.activePlayers.length)];
+                        console.log('starting player is : ' + startingPlayer);
+                        io.to(roomNumber).emit('gameStateGuess', {
+                            username: startingPlayer
+                        });
+                        roomGuesser[roomNumber] = startingPlayer;
+                    }
+                    else if(roomGuesser[roomNumber] == playerName) {
+                        io.to(roomNumber).emit('playerTurnException', {
+                            roomId: roomNumber,
+                            username: room.activePlayers[randomInt(room.activePlayers.length)],
+                        });
+                        roomGuesser[roomNumber] = room.activePlayers[randomInt(room.activePlayers.length)]; 
+                    }
+                }
             }
-        }catch{
+        }
+        catch{
             console.log('failed on playerLeave');
         }
     });
