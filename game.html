@@ -497,10 +497,13 @@
       }
 
       .player-info {
-        border: solid;
+        border: 1px solid;
+        border-radius: 10px;
         width: 80%;
         padding-left: 20px;
         margin-left: 10px; 
+        font-size: 18px;
+        font-family: 'Handlee';
       }
 
       #ready-button {
@@ -591,12 +594,6 @@
             v-bind:guess-form-msg="currentGuessFormPromptMsg"
             v-on:submit-answer="submitAnswer"
             v-on:submit-guessed-match="submitGuessedMatch"></component>
-
-          <button
-            v-for="mode in gameModes"
-            v-bind:key="mode"
-            v-on:click="gameModeTransition(mode)">{{ mode }}</button>  
-          </div>
       </div>
     </div>
   </body>
@@ -1016,6 +1013,7 @@
     // vue-socket.io-extended set up
     Vue.use(VueSocketIOExt, io('http://localhost:3000'));
 
+
     // The top level component: app
     let app = new Vue({
       el: '#app',
@@ -1028,6 +1026,7 @@
           avatarUrl: '',
           userId: undefined,
           points: 0,
+          ready: 'false'
         },
         firstTime: true,
         currentPlayerAnswered: false,
@@ -1107,6 +1106,7 @@
           useranswer: '',
         },
         input_msg: '',
+        newRoundMsg: false,
         messageLog: [],
       },
       methods: {
@@ -1251,22 +1251,31 @@
         //   userId: ...   the sessionId of the client
         // }
         currentPlayerReady: function() {
-          this.messageLog.unshift({
-            message: `You are ready`,
-            time: moment().format('h:mm:ss a')
-          });
+          if(this.currentPlayer.ready == 'false') {
+            this.messageLog.unshift({
+              message: `You are ready`,
+              time: moment().format('h:mm:ss a')
+            });
 
-          this.$socket.emit('playerStateReady', {
-            roomId: this.roomId,
-            username: this.currentPlayer.username,
-            userId: this.currentPlayer.userId
-          });
+            this.$socket.emit('playerStateReady', {
+              roomId: this.roomId,
+              username: this.currentPlayer.username,
+              userId: this.currentPlayer.userId
+            });
 
-          for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
-            if(this.playersInRoom[ii].username === this.currentPlayer.username) {
-              this.playersInRoom[ii].ready = 'true';
-              break;
+            for(let ii = 0; ii < this.playersInRoom.length; ++ii) {
+              if(this.playersInRoom[ii].username === this.currentPlayer.username) {
+                this.playersInRoom[ii].ready = 'true';
+                break;
+              }
             }
+
+            this.currentPlayer.ready = 'true';
+          } else {
+            this.messageLog.unshift({
+              message: `You are in the ready state!`,
+              time: moment().format('h:mm:ss a')
+            }); 
           }
         }
       },
@@ -1355,24 +1364,6 @@
           }
         },
       },
-      // handle all the events sent from server side
-      // Currently handle following events:
-      //  - playerJoin
-      //  - playerLeave
-      //  - answer
-      //  - playerOut
-      //  - guessMatch
-      //  - playerTurn
-      //  - newRound
-      // 
-      // Following events can be received, but still need Vue components 
-      // to handle those events:
-      //  - gameStateWait    ==> prompt window to inform player
-      //  - gameStateAnswer  ==> prompt window to inform player
-      //  - gameStateGuess   ==> prompt window to inform player
-      //  - gameStateEnd     ==> prompt window to inform player
-      //  - playerStateReady ==> An status bar after player' info to show that 
-      //                         this player is ready 
       sockets: {
         playerJoin: function(data) {
           console.log(data.playerList);
@@ -1383,7 +1374,7 @@
               this.playersInRoom.push({
                 username: data.playerList[ii].username,
                 avatarUrl: data.playerList[ii].avatar,
-                ready: data.playerList[ii].ready === true ? 'true' : 'false'
+                ready: data.playerList[ii].status == 'ready' ? 'true' : 'false'
               });
             }
             this.firstTime = false; 
@@ -1431,7 +1422,6 @@
             });
           }
         },
-        // backend should trigger this event rather than frontend (look at backend)
         playerLeave: function(data) {
           console.log(`received from server playerLeave:  
             ${data.username}    ${data.roomId}`);
@@ -1440,6 +1430,52 @@
             message: `${data.username} leaves the room`,
             time: moment().format('h:mm:ss a')
           });
+
+          if(this.currentGameMode == 'guess' 
+            || this.currentGameMode == 'observe guess'
+            || this.currentGameMode == 'answer' 
+            || this.currentGameMode == 'observe answer') {
+            let hasAnswered = false;
+            let answer = undefined;
+            for(let ii = 0; ii < this.submittedCards.length; ++ii) {
+              if(this.submittedCards[ii].username == data.username) {
+                hasAnswered = true;
+                answer = this.submittedCards[ii].useranswer;
+              }
+            }
+
+            if(hasAnswered) {
+              let hasRemoved = false;
+              this.submittedAnswers = this.submittedAnswers.filter(function(item) {
+                if(item.useranswer == answer && !hasRemoved) {
+                  return false;
+                } else {
+                  return true;
+                }
+              });
+
+              this.submittedUsers = this.submittedUsers.filter(function(item) {
+                if(item.username == data.username) {
+                  return false;
+                } else {
+                  return true;
+                }
+              });
+
+              this.submittedCards = this.submittedCards.filter(function(player) {
+                if(player.username == data.username) {
+                  return false;
+                } else {
+                  return true;
+                }
+              });
+
+              this.messageLog.unshift({
+                message: `Since ${data.username} has left the room, the card is removed from current window.`,
+                time: moment().format('h:mm:ss a')
+              });
+            }
+          }
 
           this.playersInRoom = this.playersInRoom.filter(function(player) {
             if(player.username == data.username) {
@@ -1499,25 +1535,27 @@
         },
         playerOut: function(data) {
           console.log(`playerOut received from server  ${data}`);
-          if(data.username == this.currentPlayer.username) {
-            this.messageLog.unshift({
-              message: `You are out of round`,
-              time: moment().format('h:mm:ss a')
-            });
-          } else {
-            this.messageLog.unshift({
-              message: `${data.username} is out of round`,
-              time: moment().format('h:mm:ss a')
-            });
-          }
-          
-          if(this.roomId == data.roomId) {
+          if(this.currentGameMode != 'wait') {
             if(data.username == this.currentPlayer.username) {
-              // if the username sent by backend is same as current client's 
-              // username, change game components related to 'out of round'
-              console.log(`Received matched username ${data.username}`);
-              this.currentGameMode = 'out of round';
-            } 
+              this.messageLog.unshift({
+                message: `You are out of round`,
+                time: moment().format('h:mm:ss a')
+              });
+            } else {
+              this.messageLog.unshift({
+                message: `${data.username} is out of round`,
+                time: moment().format('h:mm:ss a')
+              });
+            }
+          
+            if(this.roomId == data.roomId) {
+              if(data.username == this.currentPlayer.username) {
+                // if the username sent by backend is same as current client's 
+                // username, change game components related to 'out of round'
+                console.log(`Received matched username ${data.username}`);
+                this.currentGameMode = 'out of round';
+              } 
+            }
           }
         },
         guessMatch: function(data) {
@@ -1580,12 +1618,39 @@
             }
           }
         },
+        playerTurnException: function(data) {
+          console.log(`Received from server playerTurn 
+            ${data.roomId}  ${data.username}`);
+
+          if(data.username == this.currentPlayer.username) {
+            this.messageLog.unshift({
+              message: `Current guesser has left the room, now it is your turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
+          } else {
+            this.messageLog.unshift({
+              message: `Current guesser has left the room, now it is ${data.username}'s turn to guess a match`,
+              time: moment().format('h:mm:ss a')
+            });
+          }
+         
+          if(this.currentGameMode === 'guess' || this.currentGameMode === 'observe guess') {
+            if(data.username == this.currentPlayer.username) {
+              this.currentGameMode = 'guess';
+            } else {
+              this.currentGameMode = 'observe guess';
+            }
+          }
+        },
         newRound: function(data) {
           console.log(`Received from server playerTurn ${data}`);
-          this.messageLog.unshift({
-            message: `An new round is started, wait for all the players ready`,
-            time: moment().format('h:mm:ss a')
-          });
+          if(!this.newRoundMsg) {
+            this.messageLog.unshift({
+              message: `An new round is started, wait for all the players ready`,
+              time: moment().format('h:mm:ss a')
+            });
+            this.newRoundMsg = true;
+          }
           // When some signals are received, change the game components 
           // related to 'answers'
           this.currentGameMode = 'wait';
@@ -1632,6 +1697,9 @@
             message: `The current round is end`,
             time: moment().format('h:mm:ss a')
           });
+
+          this.newRoundMsg = false;
+          this.currentPlayer.ready = 'false';
 
           this.$socket.emit('newRound', {
             roomId: this.roomId

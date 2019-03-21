@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=0" />
+
+    <link href='https://fonts.googleapis.com/css?family=Kaushan Script' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Courgette' rel='stylesheet'>
+    <link href='https://fonts.googleapis.com/css?family=Handlee' rel='stylesheet'>
+    
+    <title>The game of Things User Error</title>
+
+    <style>
+      html, body {
+        min-height: 100%;
+        padding: 0px;
+        margin: 0px;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+
+      #error-message-container {
+        position: absolute;
+        border: solid;
+        width: 50%;
+        height: 50%;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        padding: 5px;
+      }
+
+      #title {
+        font-size: 30px;
+        text-align: center;
+        font-family: 'Kaushan Script';
+        font-size: 35px;
+      }
+
+      #things-text {
+        font-size: 50px;
+      }
+
+      #general-message {
+        font-family: 'Courgette';
+        font-size: 20px;
+      }
+
+      .info {
+        font-family: 'Handlee';
+        font-size: 20px; 
+      }
+    </style>
+  </head>
+  <body>
+    <div id="error-message-container">
+      <p id="title">
+        The game of<br>
+        <span id="things-text">things</span>
+      </p>
+      <p id="general-message">
+        {{ message }}
+      </p>
+      <p class="info">Player ID:&nbsp; &nbsp;{{ userId }}</p>
+      <p class="info">Player name:&nbsp; &nbsp;{{ username }}</p>
+      <p class="info">Room ID:&nbsp; &nbsp;{{ roomId }}</p> 
+    </div>
+  </body>
+</html>
